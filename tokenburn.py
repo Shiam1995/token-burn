@@ -106,16 +106,17 @@ def _scan_loop():
 
 
 def read_inbox():
-    """Any tool can drop lines into inbox.csv: date,model,tokens"""
+    """Any tool can drop lines into inbox.csv: date,model,tokens  (add ,est if it is an estimate)"""
     out = []
     f = HERE / "inbox.csv"
     if f.exists():
         for line in f.read_text(encoding="utf-8", errors="ignore").splitlines():
             parts = [x.strip() for x in line.split(",")]
-            if len(parts) == 3 and re.match(r"\d{4}-\d{2}-\d{2}$", parts[0]):
+            if len(parts) in (3, 4) and re.match(r"\d{4}-\d{2}-\d{2}$", parts[0]):
                 t = parse_tokens(parts[2])
                 if t:
-                    out.append({"d": parts[0], "p": parts[1], "t": t})
+                    out.append({"d": parts[0], "p": parts[1], "t": t,
+                                **({"e": 1} if parts[3:] == ["est"] else {})})
     return out
 
 

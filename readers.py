@@ -4,7 +4,8 @@ Each reader returns {(day, source, estimated): tokens}. Files are cached by
 (mtime, size), so the once-a-minute refresh only re-reads files that changed.
 
 Measured (counted from the tool's own logs):
-  Claude       ~/.claude/projects/**/*.jsonl, plus ~/token-usage/ledger.jsonl
+  Claude       ~/.claude/projects/**/*.jsonl, ~/.claude/stats-cache.json (daily totals),
+               plus ~/token-usage/ledger.jsonl
                (the ledger keeps days whose Claude Code logs were deleted)
   Codex        ~/.codex/sessions/**/*.jsonl + ledger, plus duel-lab codex-cli seats
   Antigravity  ~/.gemini/antigravity-cli/brain/*/.../transcript_full.jsonl + ledger
@@ -34,6 +35,8 @@ HOME = Path.home()
 LAB = HOME / "Lets Burn Tokens"
 MATCHES = LAB / "millennium_engine" / "matches"
 LEDGER = HOME / "token-usage" / "ledger.jsonl"
+ARCHIVE = HOME / "token-usage" / "archive.json"          # written here, see keep()
+STATS = HOME / ".claude" / "stats-cache.json"
 
 _files = {}  # path -> (sig, result)
 
@@ -211,6 +214,42 @@ def p_ledger(path):
     return out
 
 
+def p_stats(path):
+    """Claude Code's own per-day totals (/stats). They outlive the deleted transcripts."""
+    out = Counter()
+    for row in json.load(open(path, encoding="utf-8")).get("dailyModelTokens") or []:
+        out[row["date"]] += sum(int(v or 0) for v in (row.get("tokensByModel") or {}).values())
+    return out
+
+
+def keep(merged):
+    """Remember every measured day in ~/token-usage/archive.json, largest value seen.
+
+    Claude Code deletes transcripts after 30 days and other tools prune too; once a
+    day has been scanned it stays counted. merged = {tool: {day: tokens}}, updated
+    in place with anything the archive remembers. Outside the repo, never published.
+    """
+    try:
+        old = json.loads(ARCHIVE.read_text(encoding="utf-8"))
+    except Exception:
+        old = {}
+    new = {tool: dict(old.get(tool) or {}) for tool in set(old) | set(merged)}
+    for tool, days in merged.items():
+        for d, t in days.items():
+            if t > new[tool].get(d, 0):
+                new[tool][d] = int(t)
+        for d, t in new[tool].items():
+            days[d] = max(days.get(d, 0), t)
+    if new != old:
+        try:
+            ARCHIVE.parent.mkdir(exist_ok=True)
+            tmp = ARCHIVE.with_suffix(".tmp")
+            tmp.write_text(json.dumps(new, indent=0, sort_keys=True), encoding="utf-8")
+            tmp.replace(ARCHIVE)
+        except OSError:
+            pass
+
+
 def p_history(path):
     out = Counter()
     for o in jsonl(path):
@@ -253,12 +292,14 @@ def scan_all():
     # the ledger remembers days whose logs are gone: take the larger per day
     ledger = cached(str(LEDGER), p_ledger) or {}
     names = {"claude": "Claude", "codex": "Codex", "antigravity": "Antigravity"}
-    for tool, days in live.items():
-        merged = dict(days)
-        for (d, tl), t in ledger.items():
-            if tl == tool:
-                merged[d] = max(merged.get(d, 0), t)
-        for d, t in merged.items():
+    merged = {tool: dict(days) for tool, days in live.items()}
+    for (d, tl), t in ledger.items():
+        merged[tl][d] = max(merged[tl].get(d, 0), t)
+    for d, t in (cached(str(STATS), p_stats) or {}).items():
+        merged["claude"][d] = max(merged["claude"].get(d, 0), t)
+    keep(merged)
+    for tool, days in merged.items():
+        for d, t in days.items():
             res[(d, names[tool], False)] += t
 
     for f in g(HOME / ".qwen" / "usage" / "token-usage-*.jsonl"):
@@ -306,4 +347,19 @@ def scan_all():
         for d, n in hist.items():
             if d < first:
                 res[(d, "Claude", True)] += int(n * rate)
+        # days with prompts but no counts between measured days (logs deleted before
+        # anything kept them): the middle tokens-per-prompt of the 7 measured days
+        # either side, so one runaway day does not set the rate
+        both.sort()
+        gap = 0
+        for d, n in hist.items():
+            if d > first and d not in claude_days:
+                near = [b for b in both if b < d][-7:] + [b for b in both if b > d][:7]
+                rates = sorted(claude_days[b] / hist[b] for b in near)
+                if rates:
+                    gap_t = int(n * rates[len(rates) // 2])
+                    res[(d, "Claude", True)] += gap_t
+                    gap += gap_t
+        if gap:
+            notes["claude_gap_estimated"] = gap
     return {k: v for k, v in res.items() if v > 0}, notes
