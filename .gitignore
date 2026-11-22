@@ -2,6 +2,8 @@
 state.json
 scan_cache.json
 inbox.csv
+tokens.xlsx
+token-burn.png
 *.tmp
 __pycache__/
 _site/

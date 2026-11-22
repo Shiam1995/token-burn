@@ -108,6 +108,7 @@ def _scan_loop():
 def read_inbox():
     """Any tool can drop lines into inbox.csv: date,model,tokens  (add ,est if it is an estimate)"""
     out = []
+    out += read_sheet()
     f = HERE / "inbox.csv"
     if f.exists():
         for line in f.read_text(encoding="utf-8", errors="ignore").splitlines():
@@ -117,6 +118,48 @@ def read_inbox():
                 if t:
                     out.append({"d": parts[0], "p": parts[1], "t": t,
                                 **({"e": 1} if parts[3:] == ["est"] else {})})
+    return out
+
+
+SHEET = HERE / "tokens.xlsx"
+_sheet = {"sig": None, "rows": []}
+
+
+def sheet_day(v):
+    """A date cell, 2026-11-22, or 22/11/2026 (day first) -> ISO day."""
+    if hasattr(v, "strftime"):
+        return v.strftime("%Y-%m-%d")
+    s = str(v or "").strip()
+    m = re.fullmatch(r"(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})", s)
+    if m:
+        return f"{m.group(3)}-{int(m.group(2)):02d}-{int(m.group(1)):02d}"
+    return s[:10] if re.match(r"\d{4}-\d{2}-\d{2}", s) else None
+
+
+def read_sheet():
+    """tokens.xlsx, one row per entry: Date | Tool | Tokens (1.2M, 500k or a number).
+    Make it with: python3 tools/image.py   (needs openpyxl only if the sheet exists)"""
+    try:
+        st = SHEET.stat()
+    except OSError:
+        return []
+    sig = (st.st_mtime, st.st_size)
+    if _sheet["sig"] == sig:
+        return _sheet["rows"]
+    out = []
+    try:
+        import openpyxl
+        ws = openpyxl.load_workbook(SHEET, read_only=True, data_only=True).worksheets[0]
+        for row in ws.iter_rows(min_row=2, max_col=3, values_only=True):
+            d, tool, tok = (list(row) + [None] * 3)[:3]
+            d = sheet_day(d)
+            t = round(tok) if isinstance(tok, (int, float)) else parse_tokens(tok)
+            if d and t and t > 0:
+                out.append({"d": d, "p": str(tool or "Other").strip() or "Other", "t": t})
+    except Exception as e:
+        print(f"[token-burn] tokens.xlsx not read: {e}", file=sys.stderr)
+        return _sheet["rows"]
+    _sheet.update(sig=sig, rows=out)
     return out
 
 
