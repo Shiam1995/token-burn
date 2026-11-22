@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clockwork Orrery</title>
+<meta name="description" content="A brass and walnut clockwork orrery: each model is a planet sized by its share and placed by rank, moons are its recent busy days, the gears turn as fast as today's burn and an armillary ring carries the whole day history.">
+<style>
+:root{--brass1:#f3dc9a;--brass2:#c9a04a;--brass3:#8a6420;--eng:#3b2a10;--wood:#2a170c;--ink:#f6e7c1}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:#1c0f07;color:var(--ink);font-family:"DejaVu Serif",Georgia,"Times New Roman",serif;overflow-x:hidden}
+#stage{position:fixed;inset:0}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+.col{position:fixed;top:16px;right:16px;bottom:16px;width:330px;display:flex;flex-direction:column;gap:12px;z-index:2;overflow:auto;scrollbar-width:none}
+.plate{position:relative;border-radius:8px;padding:14px 18px 13px;color:var(--eng);
+  background:linear-gradient(135deg,#f6e2a6 0%,#d8b35e 22%,#f1d78f 40%,#b98c38 62%,#e9cd83 80%,#a97a2c 100%);
+  box-shadow:0 0 0 1px #5b3d12,0 0 0 4px #2b1a0b,0 6px 16px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.6),inset 0 -2px 3px rgba(80,50,10,.5)}
+.plate:after{content:"";position:absolute;inset:0;border-radius:8px;pointer-events:none;opacity:.35;mix-blend-mode:multiply;
+  background:repeating-linear-gradient(90deg,rgba(120,80,20,.12) 0 1px,transparent 1px 3px)}
+.plate .sc{position:absolute;width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff3c4,#8a6420 70%);box-shadow:inset 0 0 0 1px #5b3d12}
+.plate .sc:after{content:"";position:absolute;left:1px;right:1px;top:4px;height:1px;background:#4a3110;transform:rotate(var(--r,30deg))}
+.sc.a{top:6px;left:6px}.sc.b{top:6px;right:6px;--r:-20deg}.sc.c{bottom:6px;left:6px;--r:70deg}.sc.d{bottom:6px;right:6px;--r:10deg}
+.eng{text-shadow:0 1px 0 rgba(255,240,200,.65),0 -1px 0 rgba(60,35,5,.55)}
+.cap{font-size:11px;letter-spacing:.24em;text-transform:uppercase;text-align:center}
+.tot{font:700 27px/1.15 "DejaVu Sans Mono",monospace;text-align:center;margin:5px 0 2px;letter-spacing:.01em;white-space:nowrap}
+.sub{font-size:12px;text-align:center;font-style:italic}
+.kv{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-top:6px;align-items:baseline}
+.kv b{font:700 14px "DejaVu Sans Mono",monospace}
+.ms{height:9px;border-radius:5px;margin-top:7px;background:#5b3d12;overflow:hidden;display:flex;box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
+.ms i{display:block;height:100%}
+.pl{display:grid;grid-template-columns:14px 1fr auto;gap:2px 8px;align-items:center;font-size:12.5px;margin-top:4px}
+.pl .dot{width:12px;height:12px;border-radius:50%;box-shadow:inset -2px -2px 3px rgba(0,0,0,.45),0 0 0 1px rgba(60,35,5,.6)}
+.pl .v{font:600 12px "DejaVu Sans Mono",monospace}
+.pl .moons{grid-column:2/4;font-size:10.5px;letter-spacing:.06em;opacity:.8;margin-top:-3px}
+.title{position:fixed;left:20px;top:16px;z-index:2;pointer-events:none;color:#f0d796;text-shadow:0 2px 8px #000}
+.title h1{margin:0;font-size:22px;letter-spacing:.22em;font-weight:700}
+.title div{font-size:12px;font-style:italic;letter-spacing:.06em;color:#cdb27a}
+.tip{position:fixed;z-index:5;pointer-events:none;display:none;background:rgba(30,18,8,.94);color:var(--ink);border:1px solid #b98c38;border-radius:6px;padding:7px 9px;font-size:12px;max-width:260px}
+.tip b{font-family:"DejaVu Sans Mono",monospace}
+.demo{color:#ffcf6e}
+@media (max-width:860px){
+  #stage{position:relative;height:100vw;min-height:380px;max-height:560px}
+  .col{position:static;width:auto;margin:0 16px 18px;overflow:visible}
+  .title{position:absolute}
+  .title h1{font-size:17px}
+}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas>
+  <div class="title"><h1>THE TOKEN ORRERY</h1><div id="sub">a clockwork of models, wound by every token</div></div>
+</div>
+<aside class="col">
+  <div class="plate eng"><i class="sc a"></i><i class="sc b"></i><i class="sc c"></i><i class="sc d"></i>
+    <div class="cap">Tokens burned in all</div>
+    <div class="tot" id="total">0</div>
+    <div class="sub" id="since">since —</div>
+    <div class="kv"><span>This day</span><b id="today">0</b></div>
+    <div class="kv"><span>This week</span><b id="week">0</b></div>
+    <div class="kv"><span>Gear speed</span><b id="speed">–</b></div>
+  </div>
+  <div class="plate eng"><i class="sc a"></i><i class="sc b"></i><i class="sc c"></i><i class="sc d"></i>
+    <div class="cap">Measured &amp; estimated</div>
+    <div class="ms"><i id="mm" style="background:linear-gradient(#ffeaa8,#c98a1a)"></i><i id="me" style="background:repeating-linear-gradient(45deg,#7a5a2a 0 3px,#5b3d12 3px 6px)"></i></div>
+    <div class="kv"><span>Measured</span><b id="meas"></b></div>
+    <div class="kv"><span>Estimated</span><b id="est"></b></div>
+  </div>
+  <div class="plate eng"><i class="sc a"></i><i class="sc b"></i><i class="sc c"></i><i class="sc d"></i>
+    <div class="cap">Planets · by rank</div>
+    <div id="planets"></div>
+  </div>
+  <div class="plate eng"><i class="sc a"></i><i class="sc b"></i><i class="sc c"></i><i class="sc d"></i>
+    <div class="cap">Armillary ring · days</div>
+    <div class="kv"><span>Days turned</span><b id="ndays"></b></div>
+    <div class="kv"><span>Greatest day</span><b id="peak"></b></div>
+    <div class="kv"><span>Next billion</span><b id="nextb"></b></div>
+    <div class="sub" style="margin-top:6px">today stands at the front; dark bars are estimated</div>
+  </div>
+</aside>
+<div class="tip" id="tip"></div>
+<script src="tb-data.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const cv = $("cv"), g = cv.getContext("2d");
+let D = null, W = 0, H = 0, dpr = 1, cx = 0, cy = 0, R = 200, K = .42, wood = null;
+let planets = [], ring = [], shownTotal = 0, fromTotal = 0, tStart = 0, gearA = 0, hover = null, comets = [];
+const TAU = Math.PI * 2, clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const hex = h => { const n = parseInt(h.replace("#", ""), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const rgba = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+const shade = (c, f) => c.map(v => clamp(v * f, 0, 255));
+
+// ---------- layout + wood ----------
+function layout() {
+  const narrow = innerWidth <= 860, r = cv.getBoundingClientRect();
+  dpr = Math.min(devicePixelRatio || 1, 2); W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr;
+  const aw = narrow ? W : W - 360;
+  cx = aw / 2 + (narrow ? 0 : 10);
+  R = Math.min(aw / 2 - (narrow ? 22 : 40), (H - (narrow ? 110 : 150)) / (2 * K + .62));
+  cy = (narrow ? 70 : 60) + R * .36 + R * K + Math.max(0, (H - (narrow ? 110 : 150) - R * (2 * K + .62)) / 2);
+  makeWood(); place();
+}
+function makeWood() {
+  const o = wood || (wood = document.createElement("canvas")); o.width = cv.width; o.height = cv.height;
+  const c = o.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const base = c.createLinearGradient(0, 0, W, H); base.addColorStop(0, "#3a2110"); base.addColorStop(.5, "#2b170b"); base.addColorStop(1, "#1d0f06");
+  c.fillStyle = base; c.fillRect(0, 0, W, H);
+  let s = 5; const rnd = () => (s = s * 16807 % 2147483647) / 2147483647;
+  // planks with grain
+  const pw = 150; for (let x0 = -20; x0 < W; x0 += pw) {
+    c.fillStyle = `rgba(${60 + rnd() * 30},${30 + rnd() * 15},${10 + rnd() * 8},.35)`; c.fillRect(x0, 0, pw, H);
+    c.strokeStyle = "rgba(10,5,2,.6)"; c.lineWidth = 2; c.beginPath(); c.moveTo(x0, 0); c.lineTo(x0, H); c.stroke();
+    for (let k = 0; k < 26; k++) { const gx = x0 + rnd() * pw, amp = 2 + rnd() * 6, f = .004 + rnd() * .01, ph = rnd() * 6;
+      c.strokeStyle = `rgba(${rnd() < .5 ? "15,7,2" : "110,65,30"},${.08 + rnd() * .14})`; c.lineWidth = .6 + rnd() * 1.4; c.beginPath();
+      for (let y = 0; y <= H; y += 8) { const x = gx + Math.sin(y * f + ph) * amp + Math.sin(y * f * 3.1 + ph) * amp * .3; y ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); }
+    // a knot
+    if (rnd() < .6) { const kx = x0 + pw * (.3 + rnd() * .4), ky = rnd() * H; for (let q = 0; q < 6; q++) { c.strokeStyle = `rgba(20,9,3,${.25 - q * .03})`; c.beginPath(); c.ellipse(kx, ky, 4 + q * 4, 10 + q * 9, 0, 0, TAU); c.stroke(); } }
+  }
+  const v = c.createRadialGradient(cx, cy, R * .3, cx, cy, Math.max(W, H) * .8); v.addColorStop(0, "rgba(255,190,110,.12)"); v.addColorStop(.5, "rgba(0,0,0,.1)"); v.addColorStop(1, "rgba(0,0,0,.7)");
+  c.fillStyle = v; c.fillRect(0, 0, W, H);
+  // felt base disc under the instrument
+  c.fillStyle = "rgba(0,0,0,.45)"; c.beginPath(); c.ellipse(cx, cy + R * K + R * .27, R * .62, R * .62 * K * .7, 0, 0, TAU); c.fill();
+}
+
+// ---------- data -> bodies ----------
+function place() {
+  if (!D) return;
+  const n = D.models.length, r0 = R * .3, r1 = R * .84;
+  const recent = D.days.slice(-14);
+  planets = D.models.map((m, k) => {
+    const orb = n > 1 ? r0 + (r1 - r0) * k / (n - 1) : (r0 + r1) / 2;
+    const pr = clamp(3.5 + Math.sqrt(m.share) * R * .085, 3.5, R * .085);
+    const vals = recent.map(x => [x, x.byModel[m.name] || 0]).filter(v => v[1] > 0);
+    const peak = Math.max(1, ...vals.map(v => v[1]));
+    const moons = vals.filter(v => v[1] >= peak * .3).slice(-8).map((v, q) => ({ d: v[0].d, t: v[1], f: Math.sqrt(v[1] / peak), today: v[0].d === D.todayISO, ph: q * 2.1 }));
+    const old = planets.find(p => p.name === m.name);
+    return { name: m.name, tokens: m.tokens, share: m.share, col: hex(m.color), css: m.color, orb, pr, moons, k,
+      ang: old ? old.ang : (k * 2.399) % TAU, w: .5 / Math.pow(k + 1.3, 1.1), lift: R * .075 + k * R * .012 };
+  });
+  // ring of days, continuous calendar, today at the front
+  const span = Math.round((new Date(D.todayISO + "T00:00") - new Date(D.firstDay + "T00:00")) / 864e5) + 1;
+  const map = {}; D.days.forEach(x => map[x.d] = x);
+  let cum = 0, nb = 1e9; ring = [];
+  const t0 = new Date(D.firstDay + "T00:00");
+  for (let i = 0; i < span; i++) {
+    const dt = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + i), iso = TB.iso(dt), x = map[iso];
+    const th = Math.PI / 2 + (span - 1 - i) / Math.max(1, span) * TAU * .93 + .035 * TAU * 0;
+    let flag = 0; if (x) { cum += x.tokens; while (cum >= nb) { flag = nb; nb += 1e9; } }
+    const top = x ? Object.entries(x.byModel).sort((a, b) => b[1] - a[1])[0][0] : null;
+    ring.push({ iso, x, th, flag, col: x ? (x.est > x.tokens / 2 ? [92, 66, 30] : hex(TB.color(top))) : null, first: dt.getDate() === 1, mon: dt.getMonth() });
+  }
+}
+
+// ---------- drawing helpers ----------
+function brassGrad(x0, y0, x1, y1, dark = 1) {
+  const gr = g.createLinearGradient(x0, y0, x1, y1);
+  gr.addColorStop(0, rgba(shade([246, 222, 150], dark))); gr.addColorStop(.35, rgba(shade([196, 150, 64], dark)));
+  gr.addColorStop(.55, rgba(shade([240, 210, 130], dark))); gr.addColorStop(1, rgba(shade([128, 90, 30], dark))); return gr;
+}
+function gear(x, y, r, teeth, ang, opt = {}) {
+  const tooth = r * .14, inner = r - tooth;
+  g.save(); g.translate(x, y); g.rotate(ang);
+  g.beginPath();
+  for (let i = 0; i < teeth; i++) {
+    const a0 = i / teeth * TAU, a1 = (i + .5) / teeth * TAU, da = TAU / teeth;
+    g.lineTo(Math.cos(a0) * inner, Math.sin(a0) * inner);
+    g.lineTo(Math.cos(a0 + da * .12) * r, Math.sin(a0 + da * .12) * r);
+    g.lineTo(Math.cos(a1 - da * .12) * r, Math.sin(a1 - da * .12) * r);
+    g.lineTo(Math.cos(a1) * inner, Math.sin(a1) * inner);
+  }
+  g.closePath();
+  g.shadowColor = "rgba(0,0,0,.55)"; g.shadowBlur = 8; g.shadowOffsetY = 4;
+  g.fillStyle = brassGrad(-r, -r, r, r, opt.dark || 1); g.fill(); g.shadowBlur = 0; g.shadowOffsetY = 0;
+  g.strokeStyle = "rgba(60,35,5,.7)"; g.lineWidth = 1; g.stroke();
+  // spokes cut-outs
+  const sp = opt.spokes || 5, hub = r * .22, rim = inner * .78;
+  g.fillStyle = "rgba(25,12,4,.85)";
+  for (let i = 0; i < sp; i++) { const a = i / sp * TAU, b = (i + 1) / sp * TAU, m = TAU / sp * .17;
+    g.beginPath(); g.arc(0, 0, rim, a + m, b - m); g.arc(0, 0, hub * 1.35, b - m * 1.6, a + m * 1.6, true); g.closePath(); g.fill(); }
+  g.strokeStyle = "rgba(255,240,190,.35)"; g.beginPath(); g.arc(0, 0, rim, 0, TAU); g.stroke();
+  g.fillStyle = brassGrad(-hub, -hub, hub, hub, 1.1); g.beginPath(); g.arc(0, 0, hub, 0, TAU); g.fill();
+  g.fillStyle = "#2a1808"; g.beginPath(); g.arc(0, 0, hub * .35, 0, TAU); g.fill();
+  g.restore();
+}
+function sphere(x, y, r, col, glow) {
+  if (glow) { g.globalCompositeOperation = "lighter"; const gg = g.createRadialGradient(x, y, r * .5, x, y, r * glow); gg.addColorStop(0, rgba(col, .45)); gg.addColorStop(1, rgba(col, 0)); g.fillStyle = gg; g.beginPath(); g.arc(x, y, r * glow, 0, TAU); g.fill(); g.globalCompositeOperation = "source-over"; }
+  const gr = g.createRadialGradient(x - r * .35, y - r * .4, r * .1, x, y, r);
+  gr.addColorStop(0, rgba(col.map(v => Math.min(255, v * 1.35 + 40)))); gr.addColorStop(.55, rgba(col)); gr.addColorStop(1, rgba(shade(col, .35)));
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+}
+const P = (r, th, k = K) => [cx + Math.cos(th) * r, cy + Math.sin(th) * r * k];
+
+// ---------- ring of days ----------
+function drawRing(front, now) {
+  const rr = R * .96, bh = R * .26, max = D.maxDay;
+  // band (half)
+  const a0 = front ? 0 : Math.PI, a1 = front ? Math.PI : TAU;
+  for (const [w, c] of [[R * .05, "rgba(40,22,6,.9)"], [R * .038, null]]) {
+    g.lineWidth = w; g.strokeStyle = c || brassGrad(cx - rr, cy - rr * K, cx + rr, cy + rr * K, front ? 1 : .7);
+    g.beginPath(); g.ellipse(cx, cy, rr, rr * K, 0, a0, a1); g.stroke();
+  }
+  g.lineWidth = 1; g.strokeStyle = "rgba(60,35,5,.8)"; g.beginPath(); g.ellipse(cx, cy, rr, rr * K, 0, a0, a1); g.stroke();
+  // bars
+  for (const d of ring) {
+    const s = Math.sin(d.th); if (front ? s < 0 : s >= 0) continue;
+    const [x, y] = P(rr, d.th);
+    if (d.first) { g.fillStyle = front ? "#3b2a10" : "rgba(59,42,16,.7)"; g.font = `italic ${Math.max(9, R * .035)}px DejaVu Serif, serif`; g.textAlign = "center";
+      g.fillText(["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][d.mon], x, y + R * .012 + 3); }
+    if (!d.x) continue;
+    const h = Math.max(2, Math.sqrt(d.x.tokens / max) * bh), dim = front ? 1 : .55 + .3 * (1 + s);
+    const bw = Math.max(1.6, R * .012) * (front ? 1 : .8);
+    g.fillStyle = rgba(shade(d.col, dim)); g.fillRect(x - bw / 2, y - h - R * .018, bw, h);
+    g.fillStyle = rgba(shade([255, 230, 160], dim), .9); g.fillRect(x - bw / 2, y - h - R * .018, bw, 1.2);
+    if (d.flag) { g.fillStyle = "#ffe08a"; star(x, y - h - R * .04, R * .018); }
+    if (d.iso === D.todayISO) { const pulse = .5 + .5 * Math.sin(now * .005);
+      g.strokeStyle = `rgba(255,230,150,${.5 + .5 * pulse})`; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y + R * .03); g.lineTo(x - 6, y + R * .07); g.lineTo(x + 6, y + R * .07); g.closePath(); g.stroke();
+      g.fillStyle = "#f6e7c1"; g.font = `700 ${Math.max(10, R * .036)}px DejaVu Sans Mono, monospace`; g.textAlign = "center";
+      const tl = "TODAY " + TB.fmt(d.x.tokens), tw2 = g.measureText(tl).width, ty = y + R * .07 + Math.max(11, R * .045); g.fillStyle = "rgba(20,10,3,.7)"; g.fillRect(x - tw2 / 2 - 5, ty - Math.max(10, R * .036) - 2, tw2 + 10, Math.max(10, R * .036) + 8); g.fillStyle = "#ffe7a8"; g.fillText(tl, x, ty); }
+    d.hit = [x, y - h - R * .018, bw + 4, h + R * .03];
+  }
+}
+function star(x, y, r) { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill(); }
+
+// ---------- planets ----------
+function drawOrbit(p, front) {
+  g.strokeStyle = front ? "rgba(240,210,140,.22)" : "rgba(240,210,140,.12)"; g.lineWidth = 1; g.setLineDash([2, 4]);
+  g.beginPath(); g.ellipse(cx, cy, p.orb, p.orb * K, 0, front ? 0 : Math.PI, front ? Math.PI : TAU); g.stroke(); g.setLineDash([]);
+}
+function drawPlanet(p, now) {
+  const [x, y] = P(p.orb, p.ang), top = y - p.lift;
+  // arm from hub to below planet, then rod
+  const hubY = cy - R * .02 - p.k * R * .006;
+  g.strokeStyle = "rgba(30,16,4,.9)"; g.lineWidth = 3.4; g.beginPath(); g.moveTo(cx, hubY); g.lineTo(x, y); g.stroke();
+  g.strokeStyle = brassGrad(cx, hubY - 2, x, y + 2); g.lineWidth = 2; g.beginPath(); g.moveTo(cx, hubY); g.lineTo(x, y); g.stroke();
+  g.lineWidth = 1.6; g.beginPath(); g.moveTo(x, y); g.lineTo(x, top); g.stroke();
+  g.fillStyle = "#b98c38"; g.beginPath(); g.ellipse(x, y, 3, 1.5, 0, 0, TAU); g.fill();
+  // moons behind
+  const mo = p.moons.map((m, q) => { const a = now * .0011 * (1.6 - q * .08) + m.ph, mr = p.pr * 1.6 + 5 + q * 3.2; return { m, x: x + Math.cos(a) * mr, y: top + Math.sin(a) * mr * .45, back: Math.sin(a) < 0, r: 1.4 + m.f * 2.6 }; });
+  for (const m of mo) if (m.back) { g.strokeStyle = "rgba(240,220,170,.12)"; sphere(m.x, m.y, m.r, m.m.today ? [255, 240, 190] : [205, 196, 178], m.m.today ? 3 : 0); }
+  const glow = hover === p ? 3.2 : 1.6 + (D.intensity * .8);
+  sphere(x, top, p.pr, p.col, glow);
+  // brass equator band on the big ones
+  if (p.pr > 10) { g.strokeStyle = "rgba(255,230,160,.35)"; g.lineWidth = 1; g.beginPath(); g.ellipse(x, top, p.pr * 1.45, p.pr * .35, -.25, 0, TAU); g.stroke(); }
+  for (const m of mo) if (!m.back) sphere(m.x, m.y, m.r, m.m.today ? [255, 240, 190] : [215, 206, 188], m.m.today ? 3 : 0);
+  p.sx = x; p.sy = top;
+  // label
+  if (p.k < (W < 600 ? 3 : 6) || hover === p) {
+    const fs = Math.max(10, R * .034); g.font = `${fs}px DejaVu Serif, serif`; g.textAlign = "left";
+    const lbl = p.name + " · " + TB.fmt(p.tokens), tw = g.measureText(lbl).width, lx = x + p.pr + 6 + tw > W - 6 ? x - p.pr - 6 - tw : x + p.pr + 6; let ly = top - p.pr - 2;
+    for (let tries = 0; tries < 8; tries++) { const hit = labels.find(r => lx < r[0] + r[2] + 4 && lx + tw + 4 > r[0] && ly - fs < r[1] + 3 && ly + 3 > r[1] - fs); if (!hit) break; ly = hit[1] + fs + 6; }
+    labels.push([lx, ly, tw]);
+    g.fillStyle = "rgba(20,10,3,.6)"; g.fillRect(lx - 3, ly - fs, tw + 6, fs + 5);
+    g.fillStyle = "#f6e7c1"; g.fillText(lbl, lx, ly);
+  }
+}
+function drawSun(now) {
+  const sx = cx, sy = cy - R * .2, sr = R * .085, I = D.intensity, pulse = 1 + .06 * Math.sin(now * .004 * (1 + I * 2));
+  // column
+  g.fillStyle = brassGrad(sx - 6, 0, sx + 6, 0); g.fillRect(sx - 4, sy, 8, cy - sy + R * K + R * .22);
+  // hub gear (horizontal, drawn as ellipse of teeth)
+  const hr = R * .09; g.save(); g.translate(cx, cy - R * .02); g.scale(1, K);
+  g.rotate(gearA * .6); g.beginPath(); for (let i = 0; i < 24; i++) { const a = i / 24 * TAU; g.lineTo(Math.cos(a) * hr, Math.sin(a) * hr); g.lineTo(Math.cos(a + .07) * hr * 1.15, Math.sin(a + .07) * hr * 1.15); g.lineTo(Math.cos(a + .19) * hr * 1.15, Math.sin(a + .19) * hr * 1.15); g.lineTo(Math.cos(a + .26) * hr, Math.sin(a + .26) * hr); }
+  g.closePath(); g.fillStyle = brassGrad(-hr, -hr, hr, hr, .9); g.fill(); g.strokeStyle = "rgba(50,30,5,.8)"; g.lineWidth = 1; g.stroke(); g.restore();
+  // rays
+  g.save(); g.translate(sx, sy); g.rotate(now * .00012 * (1 + I * 3)); g.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 16; i++) { g.rotate(TAU / 16); const l = sr * (1.9 + (i % 2) * .7) * pulse; const gr = g.createLinearGradient(0, 0, l, 0); gr.addColorStop(0, "rgba(255,210,120,.55)"); gr.addColorStop(1, "rgba(255,180,80,0)"); g.fillStyle = gr; g.beginPath(); g.moveTo(0, -sr * .18); g.lineTo(l, 0); g.lineTo(0, sr * .18); g.fill(); }
+  g.restore(); g.globalCompositeOperation = "source-over";
+  sphere(sx, sy, sr * pulse, [255, 196, 90], 3 + I * 2);
+}
+function drawBase() {
+  const by = cy + R * K + R * .2, bw = R * .55;
+  // pedestal
+  g.fillStyle = "rgba(0,0,0,.4)"; g.beginPath(); g.ellipse(cx, by + R * .07, bw * 1.05, bw * K * .55, 0, 0, TAU); g.fill();
+  g.fillStyle = "#3d220e"; g.beginPath(); g.ellipse(cx, by + R * .05, bw, bw * K * .5, 0, 0, Math.PI); g.lineTo(cx - bw, by); g.ellipse(cx, by, bw, bw * K * .5, 0, Math.PI, 0, true); g.fill();
+  const tg = g.createLinearGradient(cx - bw, by, cx + bw, by); tg.addColorStop(0, "#5a3417"); tg.addColorStop(.5, "#7a4a22"); tg.addColorStop(1, "#4a2a12");
+  g.fillStyle = tg; g.beginPath(); g.ellipse(cx, by, bw, bw * K * .5, 0, 0, TAU); g.fill();
+  g.strokeStyle = brassGrad(cx - bw, by, cx + bw, by); g.lineWidth = 2.5; g.beginPath(); g.ellipse(cx, by, bw * .92, bw * K * .46, 0, 0, TAU); g.stroke();
+  // little gear train on the pedestal front, facing us
+  const gs = R * .075, gy = by + R * .09, sp = gearSpeed();
+  gear(cx - gs * 1.86, gy, gs, 14, gearA * sp, { dark: .9 });
+  gear(cx, gy + gs * .1, gs * .8, 11, -gearA * sp * 14 / 11 + Math.PI / 11, { dark: .95, spokes: 4 });
+  gear(cx + gs * 1.66, gy, gs * .95, 13, gearA * sp * 14 / 13, { dark: .9 });
+}
+const gearSpeed = () => .25 + (D ? D.intensity : .4) * 2.2;
+function cornerGears() {
+  const narrow = innerWidth <= 860, sp = gearSpeed(), a = gearA * sp;
+  const big = narrow ? R * .3 : Math.min(150, R * .42);
+  // bottom-left train, meshed: r ratio sets speed
+  const g1 = [-big * .15, H + big * .1, big, 30], r2 = big * .52, g2x = g1[0] + (big + r2) * .94 * Math.cos(-.75), g2y = g1[1] + (big + r2) * .94 * Math.sin(-.75);
+  gear(g1[0], g1[1], g1[2], g1[3], a * .3, { dark: .7, spokes: 6 });
+  gear(g2x, g2y, r2, 16, -a * .3 * 30 / 16 + .1, { dark: .75 });
+  const r3 = big * .32, g3x = g2x + (r2 + r3) * .93 * Math.cos(-1.9), g3y = g2y + (r2 + r3) * .93 * Math.sin(-1.9);
+  gear(g3x, g3y, r3, 10, a * .3 * 30 / 10 + .2, { dark: .8, spokes: 4 });
+  if (!narrow) { // top-left escapement-ish pair
+    const r4 = big * .45; gear(-r4 * .2, -r4 * .1 + 70, r4, 18, -a * .2, { dark: .55 });
+  }
+}
+
+// ---------- frame ----------
+let last = 0; const labels = [];
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (document.hidden || !D) return;
+  const dt = Math.min(.05, (now - (last || now)) / 1000); last = now;
+  const I = D.intensity; gearA += dt;
+  for (const p of planets) p.ang += dt * p.w * (.25 + I * 1.4);
+  const k = Math.min(1, (now - tStart) / (fromTotal ? 20000 : 3500)), e = 1 - Math.pow(1 - k, 3);
+  shownTotal = fromTotal + (D.total - fromTotal) * e;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.drawImage(wood, 0, 0, W, H); labels.length = 0;
+  cornerGears();
+  drawBase();
+  // back half
+  drawRing(false, now);
+  const back = planets.filter(p => Math.sin(p.ang) < 0).sort((a, b) => Math.sin(a.ang) * a.orb - Math.sin(b.ang) * b.orb);
+  const front = planets.filter(p => Math.sin(p.ang) >= 0).sort((a, b) => Math.sin(a.ang) * a.orb - Math.sin(b.ang) * b.orb);
+  for (const p of planets) drawOrbit(p, false);
+  for (const p of back) drawPlanet(p, now);
+  drawSun(now);
+  for (const p of planets) drawOrbit(p, true);
+  for (const p of front) drawPlanet(p, now);
+  drawRing(true, now);
+  // comets for milestones
+  if (comets.length) { g.globalCompositeOperation = "lighter";
+    for (const c of comets) { c.t += dt; const x = c.x0 + c.vx * c.t, y = c.y0 + c.vy * c.t; const gr = g.createLinearGradient(x, y, x - c.vx * .35, y - c.vy * .35); gr.addColorStop(0, "rgba(255,240,200,.95)"); gr.addColorStop(1, "rgba(255,180,80,0)"); g.strokeStyle = gr; g.lineWidth = 3; g.beginPath(); g.moveTo(x, y); g.lineTo(x - c.vx * .35, y - c.vy * .35); g.stroke(); }
+    comets = comets.filter(c => c.t < 3); g.globalCompositeOperation = "source-over"; }
+  if (now - (frame.ui || 0) > 200) { frame.ui = now; $("total").textContent = TB.full(shownTotal); }
+}
+function milestone() { for (let i = 0; i < 6; i++) comets.push({ x0: -50 - i * 80, y0: H * (.1 + Math.random() * .4), vx: W * .5 + Math.random() * 200, vy: 60 + Math.random() * 80, t: -i * .35 }); }
+
+// ---------- HUD ----------
+function hud(d) {
+  $("today").textContent = TB.full(d.today); $("week").textContent = TB.full(d.week);
+  $("speed").textContent = (gearSpeed() * 9.55).toFixed(1) + " rpm";
+  const t = d.measured + d.estimated || 1; $("mm").style.width = d.measured / t * 100 + "%"; $("me").style.width = d.estimated / t * 100 + "%";
+  $("meas").textContent = TB.full(d.measured); $("est").textContent = TB.full(d.estimated);
+  $("since").textContent = "wound since " + new Date(d.firstDay + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  $("sub").innerHTML = (d.demo ? '<span class="demo">sample data · </span>' : "") + "a clockwork of models, wound by every token";
+  $("planets").innerHTML = planets.map((p, k) => `<div class="pl"><span class="dot" style="background:${p.css}"></span><span>${k + 1}. ${p.name}</span><span class="v">${TB.fmt(p.tokens)} · ${(p.share * 100).toFixed(p.share < .01 ? 2 : 1)}%</span>${p.moons.length ? `<span class="moons">${"● ".repeat(p.moons.length).trim()} ${p.moons.length} busy day${p.moons.length > 1 ? "s" : ""} (14d)</span>` : ""}</div>`).join("");
+  $("ndays").textContent = d.days.length + " of " + ring.length; $("peak").textContent = TB.fmt(d.maxDay);
+  const nb = Math.ceil((d.total + 1) / 1e9) * 1e9; $("nextb").textContent = TB.fmt(nb) + " in " + TB.fmt(nb - d.total);
+}
+cv.addEventListener("mousemove", e => {
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, tip = $("tip");
+  let hp = null; for (const p of planets) if (p.sx != null && Math.hypot(mx - p.sx, my - p.sy) < Math.max(9, p.pr + 4)) hp = p;
+  hover = hp; let html = "";
+  if (hp) html = `<b>${hp.name}</b><br><b>${TB.full(hp.tokens)}</b> tokens · ${(hp.share * 100).toFixed(2)}%<br>orbit ${hp.k + 1}` + (hp.moons.length ? `<br>moons: ${hp.moons.map(m => m.d.slice(5) + " " + TB.fmt(m.t)).join(", ")}` : "");
+  else { const d = ring.find(d => d.hit && mx > d.hit[0] - d.hit[2] / 2 && mx < d.hit[0] + d.hit[2] / 2 && my > d.hit[1] - 3 && my < d.hit[1] + d.hit[3]);
+    if (d) html = `<b>${d.iso}</b><br><b>${TB.full(d.x.tokens)}</b> tokens${d.x.est ? " · est " + TB.fmt(d.x.est) : ""}<br>` + Object.entries(d.x.byModel).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `<span style="color:${TB.color(k)}">●</span> ${k} ${TB.fmt(v)}`).join("<br>") + (d.flag ? `<br>★ crossed ${TB.fmt(d.flag)}` : ""); }
+  if (!html) { tip.style.display = "none"; return; }
+  tip.innerHTML = html; tip.style.display = "block"; tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 14) + "px"; tip.style.top = Math.max(8, e.clientY - tip.offsetHeight - 10) + "px";
+});
+cv.addEventListener("mouseleave", () => { hover = null; $("tip").style.display = "none"; });
+
+TB.onData(d => {
+  const first = !D, prevT = D ? D.total : 0;
+  fromTotal = first ? 0 : shownTotal; tStart = performance.now(); D = d;
+  if (first) layout(); else place();
+  hud(d);
+  if (!first && Math.floor(d.total / 1e9) > Math.floor(prevT / 1e9)) milestone();
+});
+addEventListener("resize", () => { clearTimeout(layout.t); layout.t = setTimeout(() => D && layout(), 100); });
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

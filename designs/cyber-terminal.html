@@ -1,0 +1,1315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cyber Terminal</title>
+<meta name="description" content="A phosphor CRT simulated in WebGL (curved glass, aperture grille, scanlines, bloom, afterglow, moulded bezel) running a BIOS boot, a block-digit odometer, model table with sparklines, burn history, ledger heat map and a working tb shell.">
+<style>
+@font-face{font-family:"VT323";src:url(fonts/VT323.ttf) format("truetype");font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url(fonts/JetBrainsMono.ttf) format("truetype");font-weight:100 800;font-display:block}
+@font-face{font-family:"Rajdhani";src:url(fonts/Rajdhani-SemiBold.ttf) format("truetype");font-weight:600}
+@font-face{font-family:"Rajdhani";src:url(fonts/Rajdhani-Bold.ttf) format("truetype");font-weight:700}
+html,body{margin:0;height:100%;background:#070707;overflow:hidden;overscroll-behavior:none}
+#crt{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:text;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#flat{position:fixed;display:none}
+#kbd{position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:0;border:0;padding:0;margin:0;font-size:16px;background:transparent;color:transparent;caret-color:transparent;outline:none}
+#chin{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;pointer-events:none;box-sizing:border-box;
+  font:600 10px/1 Rajdhani,"DejaVu Sans",sans-serif;letter-spacing:.34em;color:#3b4044;text-transform:uppercase;
+  text-shadow:0 1px 0 rgba(255,255,255,.06),0 -1px 0 rgba(0,0,0,.85)}
+#chin .badge{display:flex;align-items:baseline;gap:14px;white-space:nowrap}
+#chin .badge b{font-weight:700;font-size:14px;letter-spacing:.5em;color:#4b5156}
+#chin .ctl{display:flex;align-items:center;gap:16px;pointer-events:auto}
+#chin .lab{font-size:9px;letter-spacing:.32em}
+.ph{display:flex;gap:5px;padding:4px 5px;border-radius:8px;background:linear-gradient(#08090a,#121314);box-shadow:inset 0 1px 3px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.05)}
+.ph button{width:24px;height:15px;border:0;border-radius:4px;cursor:pointer;padding:0;position:relative;
+  background:linear-gradient(#2a2d30,#16181a);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 1px 2px rgba(0,0,0,.7);transition:transform .08s}
+.ph button i{position:absolute;left:50%;top:50%;width:8px;height:3px;margin:-1.5px 0 0 -4px;border-radius:2px;background:var(--c);opacity:.22;transition:opacity .2s,box-shadow .2s}
+.ph button[aria-pressed=true]{background:linear-gradient(#131516,#1c1f21);box-shadow:inset 0 1px 3px rgba(0,0,0,.9);transform:translateY(1px)}
+.ph button[aria-pressed=true] i{opacity:1;box-shadow:0 0 6px var(--c),0 0 2px var(--c)}
+.ph button:focus-visible,#pwr:focus-visible{outline:1px solid #556;outline-offset:2px}
+#pwr{width:26px;height:26px;border-radius:50%;border:0;cursor:pointer;padding:0;position:relative;
+  background:radial-gradient(circle at 50% 32%,#303336,#16181a 68%);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 2px 4px rgba(0,0,0,.75),0 0 0 3px #0b0c0d,0 0 0 4px rgba(255,255,255,.04)}
+#pwr:active{transform:translateY(1px)}
+#pwr::after{content:"";position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-5px 0 0 -5px;border:1.5px solid #4a4f53;border-top-color:transparent;border-radius:50%}
+#pwr::before{content:"";position:absolute;left:50%;top:6px;width:1.5px;height:7px;margin-left:-.75px;background:#4a4f53;border-radius:1px}
+#led{width:6px;height:6px;border-radius:50%;background:#17261c;box-shadow:inset 0 1px 1px rgba(0,0,0,.6)}
+#chin.phone{letter-spacing:.2em}
+#chin.phone .badge span,#chin.phone .lab{display:none}
+#chin.phone .badge b{font-size:10px;letter-spacing:.38em}
+#chin.phone .ph button{width:20px;height:13px}
+#chin.phone #pwr{width:20px;height:20px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<canvas id="crt" aria-label="Token Burn terminal dashboard"></canvas>
+<canvas id="flat"></canvas>
+<input id="kbd" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="terminal input">
+<div id="chin"><span class="badge"><b>TokenBurn</b><span>7860 &middot; Phosphor terminal &middot; TTY-1</span></span>
+  <span class="ctl"><span class="lab">Phosphor</span><span class="ph" role="group" aria-label="phosphor colour">
+    <button data-t="green" style="--c:#4dff91" title="P1 green" aria-label="green phosphor"><i></i></button>
+    <button data-t="amber" style="--c:#ffb43c" title="P3 amber" aria-label="amber phosphor"><i></i></button>
+    <button data-t="white" style="--c:#e4eeff" title="P4 white" aria-label="white phosphor"><i></i></button></span>
+    <button id="pwr" title="power" aria-label="power"></button><i id="led"></i></span></div>
+<div class="sr" id="sr" aria-live="polite"></div>
+<script src="tb-data.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const crt = $("crt"), src = $("flat"), kbd = $("kbd"), chin = $("chin"), led = $("led");
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const FONTS = {
+  vt: { stack: '"VT323","JetBrains Mono","DejaVu Sans Mono",monospace', adv: .4, lh: 1.02, cap: .56, lw: .07, name: "VT323" },
+  mono: { stack: '"JetBrains Mono","DejaVu Sans Mono",monospace', adv: .6, lh: 1.34, cap: .73, lw: .06, name: "JetBrains Mono" }
+};
+const THEMES = {
+  green: { name: "P1 Green", hi: "#eafff1", fg: "#5dff9b", mid: "#35d474", dim: "#219150", dark: "#125a30", faint: "#0a2e19", acc: "#ffb84d", accD: "#b07a2c", bad: "#ff5c52", bg: "#010703", panel: "rgba(1,9,4,.9)", sel: "#0c2c18",
+    glow: [.42, 1, .62], black: [.016, .03, .021], decay: [.05, .13, .07] },
+  amber: { name: "P3 Amber", hi: "#fff6e0", fg: "#ffb43c", mid: "#e0911f", dim: "#9c6410", dark: "#5c3b08", faint: "#2e1d04", acc: "#fff0b0", accD: "#b89c5c", bad: "#ff5c52", bg: "#070401", panel: "rgba(9,5,1,.9)", sel: "#2c1b06",
+    glow: [1, .66, .24], black: [.032, .022, .011], decay: [.16, .14, .08] },
+  white: { name: "P4 White", hi: "#ffffff", fg: "#dbe7f5", mid: "#a8bbd0", dim: "#6c8096", dark: "#3b4857", faint: "#19212a", acc: "#ffd36b", accD: "#a98a44", bad: "#ff6b62", bg: "#030508", panel: "rgba(3,5,9,.9)", sel: "#142132",
+    glow: [.86, .92, 1], black: [.027, .03, .035], decay: [.035, .04, .05] }
+};
+const store = { get(k) { try { return localStorage.getItem(k) } catch (e) { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch (e) { } } };
+let themeName = store.get("tb-ct-theme"); if (themeName === "ice") themeName = "white"; if (!THEMES[themeName]) themeName = "green";
+let P = THEMES[themeName];
+let fontMode = store.get("tb-ct-font"); if (!FONTS[fontMode]) fontMode = "vt";
+let maskType = +(store.get("tb-ct-mask") || 1); if (!(maskType >= 0 && maskType <= 2)) maskType = 1;
+const GLYPH = "0123456789ABCDEF<>/\\|=+*#%$@&{}[]:;".split("");
+const rg = () => GLYPH[(Math.random() * GLYPH.length) | 0];
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const ease = t => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+const T = () => performance.now() / 1000;
+const pad2 = n => String(n).padStart(2, "0");
+const clock = () => { const d = new Date(); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds()) };
+const padL = (s, n) => String(s).padStart(n).slice(-n), padR = (s, n) => String(s).padEnd(n).slice(0, n);
+const low = s => s.toLowerCase(), slug = s => low(s).replace(/\s+/g, "-");
+const fmt = n => TB.fmt(n), full = n => TB.full(n);
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const pct = f => { const v = f * 100; return v >= 10 ? v.toFixed(1) : v >= .1 ? v.toFixed(2) : v > 0 ? "<0.1" : "0" };
+const dateOf = iso => new Date(iso + "T00:00");
+const hbarStr = (f, w) => { const e = clamp(f, 0, 1) * w, n = Math.floor(e), r = Math.floor((e - n) * 8); return "█".repeat(n) + (r && n < w ? "▏▎▍▌▋▊▉"[r - 1] : "") };
+const vbarCh = f => f <= 0 ? " " : "▁▂▃▄▅▆▇█"[clamp(Math.ceil(f * 8) - 1, 0, 7)];
+
+/* 5x7 matrix font (block digits) */
+const F5 = {
+  "0": [".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###."], "1": ["..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."],
+  "2": [".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####"], "3": ["#####", "...#.", "..#..", "...#.", "....#", "#...#", ".###."],
+  "4": ["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."], "5": ["#####", "#....", "####.", "....#", "....#", "#...#", ".###."],
+  "6": ["..##.", ".#...", "#....", "####.", "#...#", "#...#", ".###."], "7": ["#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..."],
+  "8": [".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."], "9": [".###.", "#...#", "#...#", ".####", "....#", "...#.", ".##.."],
+  ",": ["..", "..", "..", "..", ".#", ".#", "#."],
+  T: ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."], O: [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
+  K: ["#...#", "#..#.", "#.#..", "##...", "#.#..", "#..#.", "#...#"], E: ["#####", "#....", "#....", "####.", "#....", "#....", "#####"],
+  N: ["#...#", "#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#"], B: ["####.", "#...#", "#...#", "####.", "#...#", "#...#", "####."],
+  U: ["#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."], R: ["####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"],
+  " ": ["...", "...", "...", "...", "...", "...", "..."]
+};
+const units = s => { let u = 0; for (const c of s) u += (F5[c] ? F5[c][0].length : 5) + 1; return u - 1 };
+
+/* ---------------- metrics ---------------- */
+const sc = src.getContext("2d");
+const rain = document.createElement("canvas"), rc = rain.getContext("2d");
+let W, H, dpr, RS, BZ, BZB, MG, IX, IY, GW, GH, OX, OY, cw, chh, fs, COLS, ROWS, phone, F = FONTS[fontMode], LWc = 1, fontOK = false;
+const KW = () => phone ? .045 : .08;
+const snap = v => Math.round(v * RS) / RS;
+function resize() {
+  W = innerWidth; H = innerHeight; phone = W < 600;
+  dpr = Math.min(2, devicePixelRatio || 1);
+  F = FONTS[fontMode];
+  BZ = phone ? 9 : Math.round(clamp(Math.min(W, H * 1.7) * .024, 22, 44));
+  BZB = phone ? 34 : Math.round(BZ * 1.75 + 8);
+  MG = phone ? 3 : Math.round(BZ * .2);
+  IX = BZ + MG; IY = BZ + MG;
+  GW = W - 2 * IX; GH = H - IY - BZB - MG;
+  RS = Math.max(dpr, Math.min(2, Math.sqrt(2.6e6 / (GW * GH))));
+  if (GW * GH * RS * RS > 5e6) RS = Math.sqrt(5e6 / (GW * GH));
+  sc.font = "100px " + F.stack; const adv = sc.measureText("M").width / 100 || F.adv;
+  const padX = phone ? 5 : Math.round(GW * .011) + 5, padY = phone ? 6 : Math.round(GH * .014) + 4;
+  if (phone) fs = (GW - 2 * padX) / ((fontMode === "vt" ? 51 : 46) * adv);
+  else fs = Math.min((GW - 2 * padX) / (138 * adv), (GH - 2 * padY) / (37 * F.lh));
+  fs = clamp(fs, 9, 34);
+  cw = fs * adv; chh = Math.round(fs * F.lh);
+  COLS = Math.floor((GW - 2 * padX) / cw); ROWS = Math.floor((GH - 2 * padY) / chh);
+  OX = Math.round((GW - COLS * cw) / 2); OY = Math.round((GH - ROWS * chh) / 2);
+  src.width = rain.width = Math.round(GW * RS); src.height = rain.height = Math.round(GH * RS);
+  crt.width = Math.round(W * dpr); crt.height = Math.round(H * dpr);
+  LWc = Math.max(1 / RS, Math.round(fs * F.lw * RS) / RS);
+  chin.style.height = BZB + "px"; chin.style.padding = phone ? "0 14px 2px" : "0 " + (BZ + 26) + "px 4px";
+  chin.classList.toggle("phone", phone);
+  if (!glOK) Object.assign(src.style, { display: "block", left: IX + "px", top: IY + "px", width: GW + "px", height: GH + "px" });
+  if (glOK) glResize();
+  drops = []; seedRain();
+}
+
+/* ---------------- grid ---------------- */
+let CH, FG, BG, OPS, HITS, REV, L0, L1;
+function mkLayer() { const n = COLS * ROWS; return { CH: new Array(n).fill(" "), FG: new Array(n).fill(null), BG: new Array(n).fill(null) } }
+function clearGrid() { L0 = mkLayer(); L1 = null; use(L0); OPS = []; HITS = []; REV = [] }
+function use(L) { CH = L.CH; FG = L.FG; BG = L.BG }
+function put(x, y, s, col) {
+  if (y < 0 || y >= ROWS) return; s = String(s);
+  for (let i = 0; i < s.length; i++) { const xx = x + i; if (xx < 0 || xx >= COLS) continue; const k = y * COLS + xx; CH[k] = s[i]; FG[k] = col }
+}
+function segs(x, y, list, max) {
+  let cx = x; const end = max != null ? x + max : 1e9;
+  for (const [s, c] of list) { const t = String(s).slice(0, Math.max(0, end - cx)); put(cx, y, t, c); cx += t.length }
+  return cx;
+}
+const segLen = list => list.reduce((a, s) => a + String(s[0]).length, 0);
+function fillBg(x, y, w, h, col) { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (i >= 0 && i < COLS && j >= 0 && j < ROWS) BG[j * COLS + i] = col }
+const pxX = c => OX + c * cw, pxY = r => OY + r * chh;
+function op(rev, rect, fn) { OPS.push({ rev, rect, fn }) }
+function hit(x, y, w, h, kind, data) { HITS.push({ x, y, w, h, kind, data }) }
+
+/* ---------------- state ---------------- */
+let D = null, X = null, shown = 0, animFrom = 0, animTo = 0, animT0 = 0, animDur = 1;
+let phase = "wait", bootT0 = 0, bootSpeed = 1, dashT0 = 0, bootPlan = null, lastMilestone = -1;
+const LOG = []; let logScroll = 0, nextAuto = 0, autoPause = 0, tailI = 0, autoN = 0;
+let hover = null, hoverUntil = 0, mouse = null;
+let glowBoost = 0, jolt = 0, wob = 0, glitchV = 0, alertT = -9, alertMsg = "", flashBad = -9;
+let power = { v: 0, dir: 1, cb: null };
+let rainOn = false, matrixT = -9, crtOn = true;
+let userTyped = false, lastInput = T(), typeT = -9, demo = { i: 0, s: "", t: 0, on: false };
+const hist = []; let histI = 0;
+let polls = [], rateTxt = "";
+const mcol = name => { const m = D && D.models.find(x => x.name === name); return m ? m.color : P.fg };
+function glitch(g) { if (!RM) glitchV = Math.max(glitchV, g) }
+
+function say(list, kind) { LOG.push({ ts: clock(), list, t: T(), kind: kind || "sys" }); if (LOG.length > 500) LOG.shift(); if (logScroll) logScroll++; ledPulse() }
+const out = list => say(list, "out");
+
+function derive(d) {
+  const by = {}; for (const v of d.days) by[v.d] = v;
+  const td = dateOf(d.todayISO);
+  const back = i => TB.iso(new Date(td.getFullYear(), td.getMonth(), td.getDate() - i));
+  const empty = k => ({ d: k, tokens: 0, est: 0, byModel: {} });
+  const last = n => { const a = []; for (let i = n - 1; i >= 0; i--) { const k = back(i); a.push(by[k] || empty(k)) } return a };
+  const span = Math.round((td - dateOf(d.firstDay)) / 864e5) + 1;
+  let peak = d.days[0] || empty(d.todayISO); for (const v of d.days) if (v.tokens > peak.tokens) peak = v;
+  let cur = 0; for (let i = by[d.todayISO] ? 0 : 1; i < 4000; i++) { const v = by[back(i)]; if (v && v.tokens > 0) cur++; else break }
+  let best = 0, run = 0; for (let i = span - 1; i >= 0; i--) { const v = by[back(i)]; if (v && v.tokens > 0) { run++; best = Math.max(best, run) } else run = 0 }
+  const sorted = d.days.slice().sort((a, b) => b.tokens - a.tokens);
+  const todayRank = by[d.todayISO] ? sorted.indexOf(by[d.todayISO]) + 1 : 0;
+  const d14 = last(14), d7 = last(7);
+  const ms = {};
+  d.models.forEach((m, i) => {
+    let first = null, pk = null; for (const v of d.days) { const t = v.byModel[m.name] || 0; if (t > 0) { if (!first) first = v.d; if (!pk || t > pk.t) pk = { d: v.d, t } } }
+    ms[m.name] = { rank: i + 1, today: (by[d.todayISO] || empty()).byModel[m.name] || 0, week: d7.reduce((a, v) => a + (v.byModel[m.name] || 0), 0), first, peak: pk, trend: d14.map(v => v.byModel[m.name] || 0) };
+  });
+  return { by, back, span, peak, cur, best, todayRank, d60: last(60), d30: last(30), d14, d7, ms, active: d.days.length, todayDay: by[d.todayISO] || empty(d.todayISO), avg: d.total / Math.max(1, span) };
+}
+
+function onData(d) {
+  const first = !D, prev = D; D = d; X = derive(d);
+  polls.push({ t: Date.now(), total: d.total }); if (polls.length > 30) polls.shift();
+  if (polls.length >= 2) { const a = polls[polls.length - 2], b = polls[polls.length - 1]; if (b.total > a.total) rateTxt = fmt((b.total - a.total) / ((b.t - a.t) / 6e4)) + "/min live" }
+  if (first) maybeBoot();
+  else {
+    animFrom = shown; animTo = d.total; animT0 = T(); animDur = 2.4;
+    if (d.total > prev.total) { say([["sync ", P.dim], ["+" + fmt(d.total - prev.total), P.acc], [" tokens since last poll", P.mid]]); glowBoost = Math.max(glowBoost, .35); glitch(.45) }
+  }
+  seedRain();
+  $("sr").textContent = "Total tokens " + full(d.total) + ". Today " + full(d.today) + ". Measured " + full(d.measured) + ", estimated " + full(d.estimated) + ".";
+}
+function maybeBoot() {
+  if (!D || !fontOK || phase !== "wait") return;
+  bootPlan = makeBoot(); phase = "boot"; bootT0 = T();
+  const q = /[?&]boot=(\d)/.exec(location.search), lastB = +(store.get("tb-ct-booted") || 0);
+  bootSpeed = q ? (q[1] === "0" ? 50 : 1) : (Date.now() - lastB < 6 * 3600e3 ? 2.6 : 1);
+  store.set("tb-ct-booted", String(Date.now()));
+}
+
+/* ---------------- boot ---------------- */
+function makeBoot() {
+  const d = D, post = [], load = []; let t = .55;
+  const add = (arr, dur, f, gap = .05) => { arr.push({ t0: t, dur, f }); t += dur + gap };
+  const typed = (list, p) => { let n = Math.ceil(clamp(p, 0, 1) * segLen(list)); return list.map(([s, c]) => { const r = s.slice(0, Math.max(0, n)); n -= s.length; return [r, c] }) };
+  const blank = arr => add(arr, .0, () => [["", P.dim]], .04);
+  const span = Math.round((dateOf(d.todayISO) - dateOf(d.firstDay)) / 864e5) + 1;
+  const det = (label, res) => p => { const n = Math.floor(clamp(p * 1.5, 0, 1) * (phone ? 4 : 10)); return [[padR(label, phone ? 13 : 26), P.mid], [".".repeat(n).padEnd(phone ? 5 : 11), P.dark], ...(p >= 1 ? res : [])] };
+  add(post, .02, () => [["TB-BIOS (C) 2026 Token Burn Systems", P.hi]], .02);
+  add(post, .02, () => [[phone ? "Rev 2.6.1 · 7860 terminal" : "BIOS Rev 2.6.1  ·  7860 Phosphor Terminal  ·  " + P.name + " tube", P.dim]], .2);
+  blank(post);
+  add(post, .25, p => typed([[phone ? "CPU : Ledger Engine " : "Main Processor : Ledger Engine ", P.mid], [span + "-day", P.fg], [" @ 60 Hz", P.mid]], p));
+  add(post, .6, p => [[phone ? "MEM : " : "Memory Test    : ", P.mid], [full(d.total * ease(p)), p >= 1 ? P.hi : P.fg], [" tokens", P.mid], [p >= 1 ? "  OK" : "", P.hi]], .14);
+  blank(post);
+  add(post, .16, det(phone ? "Pri Master" : "Detecting Primary Master", [["LEDGER.DB ", P.fg], [d.days.length + " day files", P.dim]]));
+  add(post, .14, det(phone ? "Pri Slave" : "Detecting Primary Slave", [["MODELS.REG ", P.fg], [d.models.length + " burners", P.dim]]));
+  add(post, .14, det(phone ? "Sec Master" : "Detecting Secondary Master", [["MEASURED ", P.fg], [phone ? fmt(d.measured) : full(d.measured), P.dim]]));
+  add(post, .14, det(phone ? "Sec Slave" : "Detecting Secondary Slave", [["ESTIMATED ", P.acc], [phone ? fmt(d.estimated) : full(d.estimated), P.dim]]), .12);
+  blank(post);
+  add(post, .02, () => phone ? [["Heat ", P.mid], [Math.round(d.intensity * 100) + "%", P.acc], [d.demo ? "  DEMO DATA" : "  LIVE", P.dim]]
+    : [["Phosphor : ", P.mid], [P.name, P.fg], ["    Mask : ", P.mid], [["none", "aperture grille", "slot mask"][maskType], P.fg], ["    Heat : ", P.mid], [Math.round(d.intensity * 100) + "%", P.acc], ["    Source : ", P.mid], [d.demo ? "DEMO" : "LIVE", P.fg]], .1);
+  const postEnd = t + .35;
+  t = postEnd + .15; const loadT0 = t;
+  add(load, .02, () => [["Starting TB-DOS...", P.mid]], .15);
+  blank(load);
+  add(load, .25, p => typed([["C:\\LEDGER> ", P.dim], ["tokenburn --load ledger.db", P.hi]], p), .08);
+  const hexT0 = t;
+  add(load, .65, p => {
+    const bw = phone ? 12 : 26, i = Math.min(d.days.length - 1, Math.floor(ease(p) * d.days.length)), v = d.days[Math.max(0, i)];
+    const bar = "█".repeat(Math.round(ease(p) * bw)).padEnd(bw, "░");
+    return [[phone ? "load " : "reading day files  ", P.dim], [bar, P.fg], [padL(Math.round(ease(p) * 100) + "%", 5), P.hi], [p >= 1 || !v ? "  done" : "  " + (phone ? v.d.slice(5) : v.d) + padL(fmt(v.tokens), 8), p >= 1 ? P.fg : P.mid]];
+  }, .08);
+  const nm = Math.min(d.models.length, phone ? 5 : 8), top = d.models[0] ? d.models[0].tokens : 1;
+  for (let i = 0; i < nm; i++) {
+    const m = d.models[i];
+    add(load, .26, p => { const bw = phone ? 10 : 22, f = Math.sqrt(m.tokens / top) * ease(p);
+      return [["  + ", P.dim], [padR(low(m.name), 11), m.color], [hbarStr(f, bw).padEnd(bw, "·"), m.color], [" " + (p >= 1 ? fmt(m.tokens) : ""), P.hi]] }, i < nm - 1 ? -.21 : .06);
+  }
+  add(load, .2, p => typed([["measured ", P.fg], [pct(d.measured / d.total) + "%", P.hi], ["  estimated ", P.acc], [pct(d.estimated / d.total) + "%", P.hi], ["   [ OK ]", P.fg]], p), .12);
+  add(load, .3, p => typed([["C:\\LEDGER> ", P.dim], ["tokenburn --dash", P.hi]], p));
+  return { post, load, postEnd, loadT0, end: t + .3, hexT0, hexDur: .9 };
+}
+function hexLine(i) {
+  const v = D.days[i % D.days.length]; if (!v) return [["", P.dim]];
+  const top = Object.entries(v.byModel).sort((a, b) => b[1] - a[1])[0] || ["", 0];
+  const bytes = Math.round(v.tokens).toString(16).padStart(8, "0").match(/../g).join(" ");
+  return [["0x" + (i * 16).toString(16).toUpperCase().padStart(4, "0") + "  ", P.dark], [bytes + "  ", P.dim], [v.d + " ", P.mid], [padR(low(top[0]), 8), mcol(top[0])], [padL(fmt(v.tokens), 7), P.fg]];
+}
+function emblem(x, y, wCols, now, r) {
+  // small TOKENBURN matrix badge in a frame (BIOS logo slot)
+  const word = "TOKENBURN", u = units(word), p = Math.min((wCols - 4) * cw / u, chh * 2.2 / 7);
+  const ew = Math.ceil(u * p / cw) + 4, eh = Math.ceil(7 * p / chh) + 3;
+  const x0 = x + wCols - ew;
+  put(x0, y, "╔" + "═".repeat(ew - 2) + "╗", P.dim); for (let j = 1; j < eh - 1; j++) { put(x0, y + j, "║", P.dim); put(x0 + ew - 1, y + j, "║", P.dim) } put(x0, y + eh - 1, "╚" + "═".repeat(ew - 2) + "╝", P.dim);
+  const tag = "7860 SERIES"; put(x0 + Math.floor((ew - tag.length) / 2), y + eh - 2, tag, P.mid);
+  const lx = pxX(x0 + 2) + ((ew - 4) * cw - u * p) / 2, ly = pxY(y + 1) + 2;
+  op(1, null, c => bigText(c, word, lx, ly, p, { reveal: r, seed: 3, col: P.fg, hiTop: true, dots: true }));
+  return eh;
+}
+function drawBoot(now) {
+  const tb = (now - bootT0) * bootSpeed;
+  if (phase === "wait" || !bootPlan) {
+    const on = Math.floor(now * 2.5) % 2;
+    put(1, 1, "awaiting carrier" + ".".repeat(Math.floor(now * 3) % 4), P.dim); if (on) put(1, 2, "█", P.fg);
+    return;
+  }
+  const B = bootPlan;
+  if (tb < B.postEnd) {
+    let y = 1;
+    if (phone) { y += emblem(1, 1, COLS - 2, now, clamp(tb / .6, 0, 1)) + 1 } else emblem(COLS - 40, 1, 38, now, clamp(tb / .6, 0, 1));
+    for (const it of B.post) {
+      if (tb < it.t0) { if (Math.floor(now * 4) % 2) put(2, y, "█", P.fg); break }
+      segs(2, y, it.f((tb - it.t0) / Math.max(.001, it.dur)), COLS - 4 - (phone ? 0 : 42 * (y < 12))); y++;
+    }
+    const foot = phone ? "any key skips" : "Press DEL to enter SETUP  ·  any key skips the boot";
+    if (tb > .6) put(2, ROWS - 2, foot, Math.floor(now * 1.6) % 2 ? P.mid : P.dim);
+    if (!phone) { const st = TB.iso(new Date()) + "-7860-TTY1-" + (D.demo ? "D" : "L"); put(COLS - st.length - 2, ROWS - 2, st, P.dark) }
+  } else if (tb >= B.loadT0) {
+    let y = 1;
+    for (const it of B.load) {
+      if (tb < it.t0) { if (Math.floor(now * 4) % 2) put(2, y, "█", P.fg); break }
+      segs(2, y, it.f((tb - it.t0) / Math.max(.001, it.dur)), phone ? COLS - 4 : Math.floor(COLS * .54)); y++;
+      if (y >= ROWS - 2) break;
+    }
+    const hp = (tb - B.hexT0) / B.hexDur;
+    if (hp > 0 && D.days.length) {
+      const hx = phone ? 2 : Math.max(60, Math.floor(COLS * .58)), hy0 = phone ? y + 1 : 1, hrows = phone ? Math.max(0, ROWS - 3 - hy0) : ROWS - 4;
+      if (!phone) { put(hx - 2, hy0, "┌" + "─".repeat(Math.max(0, COLS - hx - 1)), P.faint); for (let j = 1; j < hrows + 1; j++) put(hx - 2, hy0 + j, "│", P.faint) }
+      const n = Math.min(D.days.length, Math.floor(clamp(hp, 0, 1) * D.days.length) + 1);
+      for (let r = 0; r < hrows; r++) { const i = n - hrows + r; if (i < 0) continue; segs(hx, hy0 + 1 + r, hexLine(i), COLS - hx - 1) }
+    }
+  } else if (Math.floor(now * 4) % 2) put(1, 1, "█", P.fg);
+  if (tb > B.end) startDash(now);
+}
+function dayLine(v) {
+  const dt = dateOf(v.d), top = Object.entries(v.byModel).sort((a, b) => b[1] - a[1]), bw = phone ? 6 : 12;
+  const o = [[v.d.slice(5) + " " + DOW[dt.getDay()] + " ", v.d === D.todayISO ? P.acc : P.dim], [padL(fmt(v.tokens), 7), v.d === D.todayISO ? P.acc : P.hi], [" ", P.dim],
+    [hbarStr(v.tokens / D.maxDay, bw).padEnd(bw, "·"), v.est > v.tokens / 2 ? P.accD : P.mid], [" ", P.dim]];
+  for (const [m, t] of top.slice(0, phone ? 1 : 3)) o.push([" " + low(m) + " ", mcol(m)], [pct(t / v.tokens) + "%", P.dim]);
+  if (v.est && !phone) o.push(["  est " + pct(v.est / v.tokens) + "%", P.accD]);
+  return o;
+}
+function startDash(now) {
+  if (phase === "dash") return;
+  phase = "dash"; dashT0 = now; animFrom = 0; animTo = D.total; animT0 = now + .3; animDur = 2.3; glowBoost = .8; nextAuto = now + 5;
+  lastMilestone = Math.floor(D.total / 1e8);
+  if (!LOG.length) {
+    say([["tokenburn ", P.dim], ["dashboard up", P.fg], [" · " + D.days.length + " day files · " + D.models.length + " burners · " + (D.demo ? "demo data" : "live ledger"), P.dim]]);
+    say([["tail -f ledger.log", P.mid], [" · most recent days", P.dark]]);
+    for (const v of D.days.slice(-(phone ? 5 : 9))) say(dayLine(v), "day");
+    say([["type ", P.dim], ["help", P.hi], [" for commands · click any day, bar or model to inspect it", P.dim]]);
+    tailI = Math.max(0, D.days.length - 21);
+  }
+  let top = true; try { top = window.top === window } catch (e) { top = false }
+  if (!phone && top) try { kbd.focus({ preventScroll: true }) } catch (e) { }
+}
+
+/* ---------------- matrix / block text ---------------- */
+function bigText(c, s, x, y, p, o = {}) {
+  const dots = !!o.dots, g = dots ? Math.max(.6, p * .14) : Math.max(.5, p * .07), sz = p - 2 * g, rr = dots ? Math.min(sz * .3, 3) : Math.min(sz * .14, 2);
+  let grad = null;
+  if (o.hiTop) { grad = c.createLinearGradient(0, y, 0, y + 7 * p); grad.addColorStop(0, P.hi); grad.addColorStop(.45, o.col || P.fg); grad.addColorStop(1, o.col2 || P.mid) }
+  let cx = x, i = 0;
+  for (const ch of s) {
+    const gl = F5[ch]; if (!gl) { cx += 6 * p; continue }
+    const gw = gl[0].length;
+    if (o.ghost !== false && ch !== "," && ch !== " ") { c.fillStyle = o.ghostCol || P.faint; c.globalAlpha = .45; for (let r = 0; r < 7; r++) for (let k = 0; k < gw; k++) c.fillRect(cx + k * p + g, y + r * p + g, sz, sz); c.globalAlpha = 1 }
+    const roll = o.roll ? o.roll[i] : null;
+    c.fillStyle = (o.hot && o.hot[i]) ? P.hi : (grad || o.col || P.fg);
+    const drawG = (G, oy) => { for (let r = 0; r < 7; r++) for (let k = 0; k < G[r].length; k++) if (G[r][k] === "#") {
+      if (o.reveal != null && o.reveal < 1) { const hsh = Math.abs(Math.sin((i * 97 + r * 13 + k * 7 + (o.seed || 0)) * 12.9898) * 43758.5453 % 1); if (hsh > o.reveal * 1.1 - .05) continue }
+      const yy = y + r * p + g + oy; if (yy + sz < y - 1 || yy > y + 7 * p + 1) continue;
+      if (c.roundRect && sz > 3) { c.beginPath(); c.roundRect(cx + k * p + g, yy, sz, sz, rr); c.fill() } else c.fillRect(cx + k * p + g, yy, sz, sz) } };
+    if (roll && roll.f > 0) {
+      c.save(); c.beginPath(); c.rect(cx - 1, y - 1, gw * p + 2, 7 * p + 2); c.clip();
+      drawG(gl, -roll.f * 8 * p); drawG(F5[roll.next], (1 - roll.f) * 8 * p); c.restore();
+    } else drawG(gl, 0);
+    cx += (gw + 1) * p; i++;
+  }
+  return cx - p;
+}
+function counterRoll(val) {
+  const s = full(Math.floor(val)), r = val - Math.floor(val), fl = Math.floor(val);
+  const roll = []; let k = 0;
+  for (let i = s.length - 1; i >= 0; i--) {
+    if (s[i] === ",") { roll.unshift(null); continue }
+    const pow = Math.pow(10, k), lower = fl % pow;
+    const f = k === 0 ? r : (lower === pow - 1 ? r : 0);
+    roll.unshift(f > 0.001 ? { f: ease(f), next: String((+s[i] + 1) % 10) } : null); k++;
+  }
+  return { s, roll };
+}
+
+/* ---------------- panels ---------------- */
+function rev(delay, now) { return phase === "dash" ? clamp((now - dashT0 - delay) / .6, 0, 1) : 0 }
+function panel(x, y, w, h, title, delay, now, o = {}) {
+  const r = rev(delay, now);
+  if (r <= 0 || w < 6 || h < 3) return 0;
+  fillBg(x, y, w, h, P.panel);
+  const hot = hover && hover.panel === title;
+  const col = hot ? P.mid : P.dim, dbl = !!o.double;
+  const e = ease(r * 2), tw = Math.max(1, Math.round((w - 2) * e)), th = Math.round((h - 2) * e);
+  const [tl, tr, bl, br, hz, vt] = dbl ? ["╔", "╗", "╚", "╝", "═", "║"] : ["╭", "╮", "╰", "╯", "─", "│"];
+  put(x, y, tl + hz.repeat(tw) + (tw >= w - 2 ? tr : ""), col);
+  for (let j = 0; j < th; j++) { put(x, y + 1 + j, vt, col); if (e >= 1) put(x + w - 1, y + 1 + j, vt, col) }
+  if (e >= 1) put(x, y + h - 1, bl + hz.repeat(w - 2) + br, col);
+  const [lb, rb] = dbl ? ["╡", "╞"] : ["┤", "├"];
+  if (title) {
+    const t = (" " + title + " ").slice(0, Math.ceil((title.length + 2) * clamp(r * 1.8, 0, 1)));
+    put(x + 2, y, lb, col); put(x + 3, y, t, hot ? P.hi : P.acc); put(x + 3 + t.length, y, rb, col);
+  }
+  if (o.right && e >= 1) { const t = " " + o.right + " "; const rx = x + w - 3 - t.length; put(rx, y, lb, col); put(rx + 1, y, t, P.dim); put(rx + 1 + t.length, y, rb, col) }
+  if (o.foot && e >= 1 && o.foot.length < w - 8) { const t = " " + o.foot + " "; const rx = x + w - 3 - t.length; put(rx, y + h - 1, lb, col); put(rx + 1, y + h - 1, t, P.dim); put(rx + 1 + t.length, y + h - 1, rb, col) }
+  if (r < 1) REV.push([x + 1, y + 1, w - 2, h - 2, r]);
+  hit(x, y, w, h, "panel", title);
+  return r;
+}
+function applyReveal() {
+  // clean top-down raster wipe: rows below the beam are blank, the beam row glows
+  for (const [x, y, w, h, r] of REV) {
+    const fr = y + Math.floor(clamp(r * 1.15, 0, 1) * (h + 1));
+    for (let j = Math.max(0, y); j < Math.min(ROWS, y + h); j++) for (let i = Math.max(0, x); i < Math.min(COLS, x + w); i++) {
+      const k = j * COLS + i;
+      if (j > fr) CH[k] = " "; else if (j === fr && CH[k] !== " ") FG[k] = P.hi;
+    }
+  }
+}
+const opRect = (x, y, w, h) => ({ x: pxX(x), y: pxY(y), w: w * cw, h: h * chh });
+
+let lastS = "", flashAt = [];
+function pTotal(x, y, w, h, now) {
+  const r = panel(x, y, w, h, "TOTAL TOKENS BURNED", 0, now, { double: true, right: phone ? null : "since " + D.firstDay });
+  if (!r) return;
+  const dR = h - (phone ? 3 : 5), ax = pxX(x + 2), ay = pxY(y + 1), aw = (w - 4) * cw, ah = dR * chh;
+  const cr = counterRoll(shown), u = units(cr.s);
+  const p = Math.min(aw / u, ah / 7.6);
+  if (cr.s !== lastS) { for (let i = 0; i < cr.s.length; i++) if (cr.s[i] !== lastS[i] && now - animT0 > animDur - .05) flashAt[i] = now; lastS = cr.s }
+  const hotArr = cr.s.split("").map((ch, i) => now - (flashAt[i] || 0) < .22);
+  op(r, opRect(x, y, w, h), c => bigText(c, cr.s, ax + (aw - u * p) / 2, ay + (ah - 7 * p) / 2, p, { roll: cr.roll, hiTop: true, hot: hotArr }));
+  hit(x + 1, y + 1, w - 2, dR, "total", null);
+  if (!phone) {
+    const sy = y + h - 4;
+    const sub = [[full(Math.floor(shown)), P.hi], [" tokens", P.dim], ["    ▲ +" + fmt(D.today), P.acc], [" today", P.accD], ["    ◆ " + fmt(D.week), P.fg], [" this week", P.dim], ["    ∅ " + fmt(X.avg), P.fg], [" per day", P.dim]];
+    segs(x + Math.max(2, Math.floor((w - segLen(sub)) / 2)), sy, sub, w - 4);
+    put(x + 2, y + h - 3, "┄".repeat(w - 4), P.faint);
+  }
+  const iy = y + h - 2, f = D.total ? D.measured / D.total : 1;
+  const left = phone ? [["MEAS ", P.fg], [pct(f) + "%", P.hi]] : [["MEASURED ", P.fg], [full(D.measured), P.hi], [" " + pct(f) + "%", P.fg]];
+  const right = phone ? [[pct(1 - f) + "%", P.hi], [" EST", P.acc]] : [[pct(1 - f) + "% ", P.acc], [full(D.estimated), P.hi], [" ESTIMATED", P.acc]];
+  segs(x + 2, iy, left); const rl = segLen(right); segs(x + w - 2 - rl, iy, right);
+  const bx = x + 3 + segLen(left), bw = w - 4 - segLen(left) - rl - 2;
+  if (bw > 4) {
+    op(r, opRect(x, y, w, h), c => {
+      const X0 = pxX(bx), Y0 = pxY(iy) + chh * .22, BW = bw * cw, BH = chh * .56, m = Math.round(BW * f * ease((now - dashT0 - .3) / 1.4));
+      seg(c, X0, Y0, m, BH, P.fg, 3); seg(c, X0 + m + 3, Y0, BW - m - 3, BH, P.acc, 3, true);
+    });
+    hit(bx, iy, bw, 1, "split", null); hit(x + 2, iy, w - 4, 1, "split", null);
+  }
+}
+function seg(c, x, y, w, h, col, step, est) {
+  if (w <= 0) return;
+  c.fillStyle = col; const n = Math.floor(w / step);
+  for (let i = 0; i < n; i++) c.fillRect(x + i * step, y, step - 1, h);
+  if (est) { c.fillStyle = "rgba(0,0,0,.45)"; for (let i = 0; i < w; i += 5) c.fillRect(x + i, y, 1.5, h) }
+}
+
+function pToday(x, y, w, h, now) {
+  const dt = dateOf(D.todayISO);
+  const r = panel(x, y, w, h, "TODAY // HEAT", .12, now, { right: phone ? null : DOW[dt.getDay()] + " " + dt.getDate() + " " + MON[dt.getMonth()] });
+  if (!r) return;
+  const iw = w - 4, I = D.intensity;
+  let yy = y + 1;
+  const dH = h >= 11 ? 3 : h >= 9 ? 2 : 0;
+  if (dH) {
+    put(x + 2, yy, "BURNED TODAY", P.dim); const rk = X.todayRank ? "#" + X.todayRank + " of " + X.active + " days" : "no burn yet"; put(x + w - 2 - rk.length, yy, rk, P.dim);
+    const s = full(D.today), u = units(s), aw = iw * cw, ah = dH * chh, p = Math.min(aw / u, ah / 7.3), ax = pxX(x + 2), ay = pxY(yy + 1);
+    op(r, opRect(x, y, w, h), c => bigText(c, s, ax + (aw - u * p) / 2, ay + (ah - 7 * p) / 2 + 1, p, { col: P.acc, col2: P.accD, hiTop: true, ghostCol: P.faint }));
+    hit(x + 1, yy + 1, w - 2, dH, "day", D.todayISO);
+    yy += 1 + dH;
+    if (h >= 11) {
+    const share = D.total ? D.today / D.total : 0; const cap = pct(share) + "% of all-time · " + (D.today > X.avg ? (D.today / X.avg).toFixed(1) + "x the daily mean" : "below the daily mean");
+    put(x + Math.max(2, Math.floor((w - cap.length) / 2)), yy, cap.slice(0, iw), P.accD); yy++; }
+  } else {
+    put(x + 2, yy, "TODAY", P.dim); const s = full(D.today) + " tok"; put(x + w - 2 - s.length, yy, s, P.acc); yy++;
+  }
+  put(x + 2, yy, "HEAT", P.dim); const hp = (Math.round(I * 100) + "%").padStart(4); put(x + w - 2 - hp.length, yy, hp, P.acc);
+  const gx = x + 8, gw = w - 8 - 2 - hp.length - 1, gy = yy;
+  op(r, opRect(x, y, w, h), c => {
+    const X0 = pxX(gx), Y0 = pxY(gy) + chh * .22, BW = gw * cw, BH = chh * .56, n = Math.floor(BW / 5), lit = Math.round(n * I * ease((now - dashT0 - .4) / 1.4));
+    for (let i = 0; i < n; i++) { const f = i / n; c.fillStyle = i < lit ? (f < .55 ? P.fg : f < .82 ? P.acc : P.bad) : P.faint;
+      if (i === lit - 1 && !RM) c.globalAlpha = .55 + .45 * Math.abs(Math.sin(now * (4 + 8 * I))); c.fillRect(X0 + i * 5, Y0, 3.5, BH); c.globalAlpha = 1 }
+  });
+  hit(x + 1, yy, w - 2, 1, "heat", null); yy++;
+  const tb = Object.entries(X.todayDay.byModel).sort((a, b) => b[1] - a[1]);
+  put(x + 2, yy, "MIX", P.dim);
+  const my = yy;
+  op(r, opRect(x, y, w, h), c => {
+    const X0 = pxX(x + 8), Y0 = pxY(my) + chh * .28, BW = (w - 10) * cw, BH = chh * .44; let cx = X0;
+    if (!tb.length) { c.fillStyle = P.faint; c.fillRect(X0, Y0, BW, BH); return }
+    const tot = tb.reduce((a, v) => a + v[1], 0), g = ease((now - dashT0 - .5) / 1.2);
+    for (const [m, v] of tb) { const ww = v / tot * BW * g; c.fillStyle = mcol(m); c.fillRect(cx, Y0, Math.max(0, ww - 2), BH); cx += ww }
+  });
+  hit(x + 1, yy, w - 2, 1, "day", D.todayISO); yy++;
+  if (h >= 10 || (dH && yy < y + h - 2)) {
+    let cx = x + 2; for (const [m, v] of tb.slice(0, 4)) { const s = low(m) + " " + fmt(v); if (cx + s.length + 2 > x + w - 2) break; put(cx, yy, "■", mcol(m)); put(cx + 2, yy, s, P.mid); cx += s.length + 4 }
+    if (!tb.length) put(x + 2, yy, "no burn yet today", P.dim); yy++;
+  }
+  if (yy < y + h - 1) {
+    const lab = phone ? [["7D ", P.dim], [fmt(D.week), P.fg]] : [["WEEK ", P.dim], [full(D.week), P.fg]];
+    segs(x + 2, yy, lab);
+    const bw = Math.min(15, w - 4 - segLen(lab) - 6), days = X.d30.slice(-bw * 2), mx = Math.max(1, ...days.map(v => v.tokens));
+    let s = ""; const BIT = [[0x40, 0x04, 0x02, 0x01], [0x80, 0x20, 0x10, 0x08]];
+    for (let i = 0; i < bw; i++) { let code = 0; for (let k = 0; k < 2; k++) { const v = days[i * 2 + k]; const lv = v && v.tokens > 0 ? Math.max(1, Math.round(v.tokens / mx * 4)) : 0; for (let q = 0; q < lv; q++) code |= BIT[k][q] } s += String.fromCharCode(0x2800 + (code || 0x40 | 0x80)) }
+    put(x + w - 2 - bw - 4, yy, "30d", P.dark); put(x + w - 2 - bw, yy, s, P.mid);
+  }
+}
+
+function pModels(x, y, w, h, nM, now) {
+  const r = panel(x, y, w, h, "MODELS // ls -S", .22, now, { right: phone ? null : D.models.length + " burners" });
+  if (!r) return;
+  const iw = w - 4, wide = !phone && iw >= 80;
+  const cols = phone ? { rk: 0, nm: 11, tk: 14, sh: 7, tr: 0, td: 0 } : { rk: 3, nm: 12, tk: 14, sh: 8, tr: wide ? 14 : 0, td: wide ? 9 : 0 };
+  const barW = iw - cols.rk - cols.nm - cols.tk - cols.sh - 2 - (cols.tr ? cols.tr + 2 : 0) - (cols.td ? cols.td + 1 : 0);
+  const hdr = [[cols.rk ? padR("#", cols.rk) : "", P.dark], [padR("MODEL", cols.nm), P.dim], [padL("TOKENS", cols.tk), P.dim], [padL("SHARE", cols.sh), P.dim], ["  " + padR(barW >= 12 ? "BURN (sqrt)" : "BURN", barW), P.dim]];
+  if (cols.tr) hdr.push(["  " + padR("14 DAYS", cols.tr), P.dim]); if (cols.td) hdr.push([" " + padL("TODAY", cols.td), P.dim]);
+  segs(x + 2, y + 1, hdr);
+  const top = D.models[0] ? D.models[0].tokens : 1, n = Math.min(nM, h - (phone ? 3 : 4));
+  const g = ease((now - dashT0 - .5) / 1.6);
+  for (let i = 0; i < n; i++) {
+    const m = D.models[i], yy = y + 2 + i, st = X.ms[m.name], hv = hover && hover.kind === "model" && hover.data === m.name;
+    if (hv) fillBg(x + 1, yy, w - 2, 1, P.sel);
+    let c0 = x + 2;
+    if (cols.rk) { put(c0, yy, padR(String(i + 1), cols.rk), P.dark); c0 += cols.rk }
+    put(c0, yy, padR(low(m.name), cols.nm), m.color); c0 += cols.nm;
+    put(c0, yy, padL(full(m.tokens), cols.tk), hv ? P.hi : P.fg); c0 += cols.tk;
+    put(c0, yy, padL(pct(m.share) + "%", cols.sh), P.mid); c0 += cols.sh + 2;
+    const bx = c0, act = D.today ? st.today / D.today : 0;
+    op(r, opRect(x, y, w, h), c => {
+      const X0 = pxX(bx), Y0 = pxY(yy) + chh * .26, BW = barW * cw, BH = chh * .48, L = Math.max(2, Math.sqrt(m.tokens / top) * BW * g);
+      c.fillStyle = P.faint; for (let k = 0; k < BW; k += 4) c.fillRect(X0 + k, Y0 + BH / 2 - .5, 1.5, 1);
+      c.fillStyle = m.color; c.fillRect(X0, Y0, L, BH);
+      c.fillStyle = "rgba(0,0,0,.3)"; c.fillRect(X0, Y0 + BH * .62, L, BH * .38);
+      if (act > 0 && !RM) { const sp = 30 + 140 * act, pos = (now * sp + i * 37) % (L + 40) - 20; const gr = c.createLinearGradient(X0 + pos - 14, 0, X0 + pos + 14, 0); gr.addColorStop(0, "rgba(255,255,255,0)"); gr.addColorStop(.5, "rgba(255,255,255,.5)"); gr.addColorStop(1, "rgba(255,255,255,0)"); c.fillStyle = gr; c.fillRect(Math.max(X0, X0 + pos - 14), Y0, Math.max(0, Math.min(28, X0 + L - (X0 + pos - 14))), BH) }
+    });
+    c0 += barW;
+    if (cols.tr) {
+      const tr = st.trend, mx = Math.max(1, ...tr); let s = ""; for (const v of tr) s += v > 0 ? vbarCh(Math.max(.13, v / mx)) : "▁";
+      for (let k = 0; k < tr.length; k++) put(c0 + 2 + k, yy, s[k], tr[k] > 0 ? (k === tr.length - 1 ? P.hi : m.color) : P.faint);
+      c0 += cols.tr + 2;
+    }
+    if (cols.td) put(c0 + 1, yy, padL(st.today ? "+" + fmt(st.today) : "·", cols.td), st.today ? P.acc : P.dark);
+    hit(x + 1, yy, w - 2, 1, "model", m.name);
+  }
+  if (!phone && h - 4 > n - 1) {
+    const fy = y + h - 2, rest = D.models.length - n;
+    segs(x + 2, fy, [[padR("Σ", cols.rk + cols.nm), P.dim], [padL(full(D.models.reduce((a, m) => a + m.tokens, 0)), cols.tk), P.hi], [rest > 0 ? "   +" + rest + " more (tb models)" : "", P.dim], ["   today ", P.dim], [fmt(D.today), P.acc]]);
+  }
+}
+
+function pBurn(x, y, w, h, now) {
+  const N = Math.min(60, Math.floor(((w - 10) * cw) / 3));
+  const r = panel(x, y, w, h, "BURN // " + N + "D", .32, now, { right: phone ? null : "stacked by model" });
+  if (!r) return;
+  const days = X.d60.slice(-N), mx = Math.max(1, ...days.map(v => v.tokens));
+  const rows = h - 4, lab = 7, cx0 = x + 1 + lab, cw0 = w - 2 - lab - 1;
+  put(x + 1, y + 1, padL(fmt(mx), lab - 1), P.dim); put(x + 1, y + Math.max(1, Math.round(rows / 2)), padL(fmt(mx / 2), lab - 1), P.dark); put(x + 1, y + rows, padL("0", lab - 1), P.dark);
+  const order = D.models.map(m => m.name);
+  const g = ease((now - dashT0 - .6) / 1.5);
+  const hvD = hover && (hover.kind === "day") ? hover.data : null;
+  op(r, opRect(x, y, w, h), c => {
+    const X0 = pxX(cx0), Y1 = pxY(y + 1 + rows) - 2, Y0 = pxY(y + 1) + 4, HH = Y1 - Y0, BW = cw0 * cw, bw = BW / days.length, gap = bw > 4 ? 1.4 : .7;
+    c.fillStyle = P.faint; for (const f of [.25, .5, .75, 1]) { const yy = Math.round(Y1 - HH * f); for (let k = 0; k < BW; k += 3) c.fillRect(X0 + k, yy, 1, 1) }
+    c.fillStyle = P.dark; c.fillRect(X0, Y1, BW, 1);
+    days.forEach((v, i) => {
+      const bx = X0 + i * bw, isT = v.d === D.todayISO;
+      if (v.d === hvD) { c.fillStyle = P.sel; c.fillRect(bx - gap / 2, Y0 - 3, bw, HH + 3) }
+      if (!v.tokens) { c.fillStyle = P.faint; c.fillRect(bx, Y1 - 1, bw - gap, 1); return }
+      let yb = Y1; const hh = v.tokens / mx * HH * g;
+      const ent = order.filter(n => v.byModel[n]).map(n => [n, v.byModel[n]]);
+      for (const [n, t] of ent) { const sh = t / v.tokens * hh; c.fillStyle = mcol(n); c.fillRect(bx, yb - sh, bw - gap, Math.max(.6, sh - .5)); yb -= sh }
+      if (v.est > 0) { const eh = v.est / v.tokens * hh; c.fillStyle = "rgba(0,0,0,.5)"; for (let q = 0; q < eh; q += 3) c.fillRect(bx, Y1 - q - 1.2, bw - gap, 1.2) }
+      if (isT) { c.fillStyle = P.hi; c.globalAlpha = RM ? .8 : .5 + .5 * Math.abs(Math.sin(now * (2 + 6 * D.intensity))); c.fillRect(bx - 1, Y1 - hh - 3, bw - gap + 2, 2); c.globalAlpha = 1 }
+      if (v.d === X.peak.d) { c.fillStyle = P.acc; const tx = bx + (bw - gap) / 2; c.beginPath(); c.moveTo(tx - 3, Y1 - hh - 9); c.lineTo(tx + 3, Y1 - hh - 9); c.lineTo(tx, Y1 - hh - 5); c.fill() }
+    });
+  });
+  for (let i = 0; i < days.length; i++) { const c0 = cx0 + Math.floor(i * cw0 / days.length), c1 = cx0 + Math.floor((i + 1) * cw0 / days.length); hit(c0, y + 1, Math.max(1, c1 - c0), rows, "day", days[i].d) }
+  const ly = y + h - 3, a = days[0].d.slice(5), mid = days[Math.floor(days.length / 2)].d.slice(5), b = "today";
+  put(cx0, ly, a, P.dim); put(cx0 + Math.floor(cw0 / 2) - 2, ly, mid, P.dim); put(cx0 + cw0 - b.length, ly, b, P.acc);
+  const sum = days.reduce((s, v) => s + v.tokens, 0);
+  const sl = [["Σ ", P.dim], [fmt(sum), P.hi], ["  ∅ ", P.dim], [fmt(sum / days.length) + "/d", P.fg], ["  ▼ peak ", P.acc], [X.peak.d.slice(5) + " " + fmt(X.peak.tokens), P.fg], ["  ▒ est", P.dark]];
+  segs(x + 2, y + h - 2, sl, w - 4);
+}
+
+function pCal(x, y, w, h, now) {
+  const r = panel(x, y, w, h, "LEDGER // every day", .5, now, { right: phone ? null : X.active + "/" + X.span + " days lit", foot: "less ░▒▓█ more · amber = est" });
+  if (!r) return;
+  const iw = w - 4, first = dateOf(D.firstDay), td = dateOf(D.todayISO);
+  const mon = d => (d.getDay() + 6) % 7;
+  const start = new Date(first.getFullYear(), first.getMonth(), first.getDate() - mon(first));
+  const weeks = Math.floor((td - start) / 864e5 / 7) + 1;
+  let pitch = 3; if (3 + weeks * 3 > iw) pitch = 2;
+  const fitW = Math.floor((iw - 3) / pitch), wk0 = Math.max(0, weeks - fitW), shownW = weeks - wk0;
+  const gx = x + 2 + 3 + Math.max(0, Math.floor((iw - 3 - shownW * pitch) / 2)), gy = y + 2;
+  const dRows = Math.max(3, Math.min(7, h - 3)), dS = dRows / 7, rowOf = dd => gy + Math.floor(dd * dS);
+  if (dRows === 7) ["Mo", "", "We", "", "Fr", "", "Su"].forEach((s, i) => put(x + 2, gy + i, s, P.dark)); else { put(x + 2, gy, "Mo", P.dark); put(x + 2, gy + dRows - 1, "Su", P.dark) }
+  const mxL = Math.log(X.peak.tokens + 1);
+  const lvl = t => t <= 0 ? 0 : 1 + Math.min(3, Math.floor(Math.max(0, Math.log(t + 1) - mxL * .55) / (mxL * .45) * 4 * .999));
+  const cols = [P.faint, P.dark, P.dim, P.mid, P.fg];
+  let lastM = -1;
+  const cells = [];
+  for (let wk = wk0; wk < weeks; wk++) {
+    for (let dd = 0; dd < 7; dd++) {
+      const dt = new Date(start.getFullYear(), start.getMonth(), start.getDate() + wk * 7 + dd);
+      if (dt > td) break;
+      const k = TB.iso(dt), v = X.by[k], cxp = gx + (wk - wk0) * pitch, cyp = gy + dd * dS;
+      if ((dd === 0 || dt.getDate() === 1) && dt.getMonth() !== lastM && dt.getDate() <= 7) { put(cxp, y + 1, MON[dt.getMonth()], P.dim); lastM = dt.getMonth() }
+      cells.push([cxp, cyp, k, v, dt < first]);
+      if (dt >= first) hit(cxp, rowOf(dd), 2, 1, "day", k);
+    }
+  }
+  const hvD = hover && hover.kind === "day" ? hover.data : null;
+  op(r, opRect(x, y, w, h), c => {
+    const bw = (pitch === 3 ? 2 * cw : 2 * cw - 2) - 2, bh = chh * dS - (dS < 1 ? 2 : 5);
+    for (const [cxp, cyp, k, v, pre] of cells) {
+      if (pre) continue;
+      const X0 = pxX(cxp) + 1, Y0 = OY + cyp * chh + (dS < 1 ? 1 : 2.5), t = v ? v.tokens : 0, L = lvl(t);
+      c.fillStyle = cols[L]; if (v && v.est > t / 2 && L) c.fillStyle = L >= 3 ? P.acc : P.accD;
+      if (!L) { c.globalAlpha = .9; c.fillRect(X0, Y0 + bh / 2 - 1, bw, 2); c.globalAlpha = 1 }
+      else c.fillRect(X0, Y0, bw, bh);
+      if (L === 4) { c.fillStyle = "rgba(255,255,255,.22)"; c.fillRect(X0, Y0, bw, 2) }
+      if (k === D.todayISO) { c.strokeStyle = P.hi; c.lineWidth = 1; c.globalAlpha = RM ? 1 : .4 + .6 * Math.abs(Math.sin(now * 3)); c.strokeRect(X0 - 1.5, Y0 - 1.5, bw + 3, bh + 3); c.globalAlpha = 1 }
+      if (k === hvD) { c.strokeStyle = P.acc; c.lineWidth = 1.5; c.strokeRect(X0 - 2, Y0 - 2, bw + 4, bh + 4) }
+    }
+  });
+  if (h >= 12 && !phone) {
+    const sl = [["streak ", P.dim], [X.cur + "d", P.fg], ["  best ", P.dim], [X.best + "d", P.fg], ["  avg ", P.dim], [fmt(X.avg) + "/d", P.fg]];
+    segs(x + 2 + Math.floor((iw - segLen(sl)) / 2), y + h - 2, sl);
+  }
+}
+
+function pLog(x, y, w, h, now) {
+  const r = panel(x, y, w, h, "TTY1 // tail -f ledger.log", .42, now, { right: phone ? null : logScroll ? "scrolled " + logScroll + " · wheel" : "wheel to scroll" });
+  if (!r) return;
+  const n = h - 2, iw = w - 4, tsW = phone ? 0 : 10;
+  const endI = LOG.length - logScroll, lines = LOG.slice(Math.max(0, endI - n), endI);
+  for (let i = 0; i < lines.length; i++) {
+    const L = lines[i], yy = y + 1 + i + (n - lines.length);
+    let list = L.list;
+    if (now - L.t < .3 && L.kind !== "cmd") { let left = Math.floor((now - L.t) / .3 * segLen(list)); list = list.map(([s, c]) => { const t = s.slice(0, Math.max(0, left)); left -= s.length; return [t, c] }) }
+    if (L.kind === "sys" && tsW) put(x + 2, yy, L.ts, P.dark);
+    if ((L.kind === "day" || L.kind === "replay") && tsW) put(x + 2, yy, L.kind === "day" ? "ledger" : "replay", P.dark);
+    if (L.kind === "cmd") { segs(x + 2, yy, [[phone ? "$ " : "tb@tty1:~$ ", P.dim], ...list], iw); continue }
+    const ind = L.kind === "out" ? (tsW ? 2 : 1) : tsW;
+    segs(x + 2 + ind, yy, list, iw - ind);
+  }
+  if (logScroll) put(x + w - 4, y + h - 2, "▼", P.acc);
+  hit(x, y, w, h, "log", null);
+}
+
+function header(now) {
+  fillBg(0, 0, COLS, 1, P.mid);
+  const alert = now - alertT < 4.5, blink = Math.floor(now * 3) % 2;
+  if (alert) fillBg(0, 0, COLS, 1, blink ? P.acc : P.mid);
+  if (now - flashBad < .35) fillBg(0, 0, COLS, 1, P.bad);
+  const ink = P.bg;
+  put(1, 0, phone ? "▣ TOKENBURN" : "▣ TOKENBURN://TTY1", ink);
+  const stamp = TB.iso(new Date()) + " " + clock();
+  const mid = alert ? alertMsg : (phone ? clock() : stamp);
+  put(Math.floor((COLS - mid.length) / 2), 0, mid, ink);
+  const live = D ? (D.demo ? "DEMO ○" : "LIVE " + (blink ? "◉" : "○")) : "....";
+  put(COLS - live.length - 1, 0, live, ink);
+  if (!phone && COLS > 110 && !alert) { const th = P.name.toUpperCase(); put(COLS - live.length - 4 - th.length, 0, th, ink) }
+}
+const minutesToday = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes() + 1 };
+function ticker(now) {
+  fillBg(0, 1, COLS, 1, "rgba(0,0,0,.35)");
+  if (!D || phase !== "dash") return;
+  const it = [["UPTIME", X.span + "d"], ["ACTIVE", X.active + "d"], ["STREAK", X.cur + "d (best " + X.best + "d)"], ["AVG", fmt(X.avg) + "/day"], ["PEAK", X.peak.d + " " + fmt(X.peak.tokens)],
+    ["RATE", rateTxt || fmt(D.today / Math.max(1, minutesToday())) + "/min today"], ["MEASURED", pct(D.measured / D.total) + "%"], ["MODELS", D.models.length], ["TOP", low(D.models[0].name) + " " + pct(D.models[0].share) + "%"], ["NEXT MILESTONE", fmt(Math.ceil((D.total + 1) / 1e8) * 1e8)]];
+  const wOf = ([k, v]) => k.length + String(v).length + 6, totW = it.reduce((a, e) => a + wOf(e), 0);
+  const np = Math.max(1, Math.ceil(totW / (COLS - 4))), per = totW / np, pages = [[]]; let used = 0;
+  for (const e of it) { const w = wOf(e); if ((used + w / 2 > per || used + w > COLS - 2) && pages[pages.length - 1].length) { pages.push([]); used = 0 } pages[pages.length - 1].push(e); used += w }
+  const ph = (now - dashT0) / 7, pg = pages[Math.floor(ph) % pages.length], fr = ph - Math.floor(ph);
+  const list = []; pg.forEach(([k, v], i) => { if (i) list.push(["  ┃  ", P.faint]); list.push([k + " ", P.dim], [String(v), P.fg]) });
+  let cx = Math.max(1, Math.floor((COLS - segLen(list)) / 2)), left = pages.length > 1 && !RM ? Math.floor(fr / .08 * segLen(list)) : 1e9;
+  for (const [s, c] of list) { const t = s.slice(0, Math.max(0, left)); left -= s.length; put(cx, 1, t, c); cx += s.length }
+}
+
+/* ---------------- prompt + shell ---------------- */
+function prompt(y, now) {
+  fillBg(0, y, COLS, 1, P.panel);
+  const ps = phone ? "tb:~$ " : "tb@tty1:~$ ";
+  put(0, y, ps, P.fg);
+  const typing = !!kbd.value || !userTyped && demo.on;
+  const s = kbd.value || (demo.on && !userTyped ? demo.s : ""), cur = kbd.value ? (kbd.selectionStart ?? s.length) : s.length;
+  const room = COLS - ps.length - 2, off = Math.max(0, cur - room);
+  const vis = s.slice(off, off + room);
+  for (let i = 0; i < vis.length; i++) put(ps.length + i, y, vis[i], (i + off === s.length - 1 && now - typeT < .2) ? P.hi : (kbd.value ? P.hi : P.mid));
+  if (!typing && !s) { const hint = phone ? "tap here · try help" : "type help · TAB completes · ↑↓ history · click the charts"; put(ps.length + 2, y, hint, P.dark) }
+  const focused = document.activeElement === kbd;
+  const on = now - typeT < .6 || Math.floor(now * 2.2) % 2 === 0;
+  if (on) { const cx = ps.length + cur - off; if (focused || demo.on) { const k = y * COLS + cx; if (cx < COLS) { BG[k] = P.fg; FG[k] = P.bg } } else put(cx, y, "▁", P.dim) }
+  hit(0, y, COLS, 1, "prompt", null);
+}
+const CMDS = ["help", "tb", "theme", "phosphor", "font", "crt", "degauss", "glitch", "power", "rain", "matrix", "boot", "clear", "history", "date", "whoami", "uptime", "echo", "sudo", "exit"];
+const SUB = { tb: ["total", "today", "week", "month", "split", "peak", "models", "model", "day", "top", "chart", "forecast", "rate", "streak"], theme: ["green", "amber", "white"], phosphor: ["green", "amber", "white"], font: ["vt", "mono"], crt: ["on", "off", "grille", "slot", "nomask"], rain: ["on", "off"] };
+function candidates(parts) {
+  if (parts.length === 1) return CMDS;
+  if (parts[0] === "tb" && parts.length === 2) return SUB.tb;
+  if (parts[0] === "tb" && parts[1] === "model" && parts.length === 3) return D.models.map(m => slug(m.name));
+  if (parts[0] === "tb" && parts[1] === "day" && parts.length === 3) return ["today", "yesterday", "peak"].concat(D.days.slice(-14).map(v => v.d).reverse());
+  if (SUB[parts[0]] && parts.length === 2) return SUB[parts[0]];
+  return [];
+}
+function complete(line) {
+  const parts = line.replace(/^\s+/, "").split(/\s+/), last = parts[parts.length - 1];
+  const m = candidates(parts).filter(c => c.startsWith(last));
+  if (!m.length) { flashBad = T(); jolt = 1; return line }
+  if (m.length === 1) { parts[parts.length - 1] = m[0]; glowBoost = Math.max(glowBoost, .25); return parts.join(" ") + " " }
+  let cp = m[0]; for (const s of m) while (!s.startsWith(cp)) cp = cp.slice(0, -1);
+  if (cp.length > last.length) { parts[parts.length - 1] = cp; return parts.join(" ") }
+  out([[m.join("  "), P.mid]]); return line;
+}
+function dayOut(k) {
+  const v = X.by[k]; const dt = dateOf(k);
+  if (!v) { out([[k + " (" + DOW[dt.getDay()] + ")", P.acc], ["  no tokens burned", P.dim]]); return }
+  out([[k + " " + DOW[dt.getDay()], P.acc], ["  " + full(v.tokens), P.hi], [" tokens", P.dim], [v.est ? "  (" + pct(v.est / v.tokens) + "% estimated)" : "  measured", v.est ? P.accD : P.dim]]);
+  const ent = Object.entries(v.byModel).sort((a, b) => b[1] - a[1]), bw = phone ? 12 : 26;
+  for (const [m, t] of ent.slice(0, 6)) out([[padR(low(m), 12), mcol(m)], [padL(full(t), 14), P.fg], ["  " + hbarStr(t / ent[0][1], bw), mcol(m)]]);
+}
+const etaTxt = days => { if (!isFinite(days)) return "never at this rate"; if (days < 1) return "~" + Math.max(1, Math.round(days * 24)) + " h"; const d = new Date(Date.now() + days * 864e5); return days.toFixed(1) + " days (" + TB.iso(d) + ")" };
+function chartOut(n) {
+  const days = []; for (let i = n - 1; i >= 0; i--) { const k = X.back(i); days.push(X.by[k] || { d: k, tokens: 0, byModel: {} }) }
+  const mx = Math.max(1, ...days.map(v => v.tokens)), R = 6, topM = v => (Object.entries(v.byModel).sort((a, b) => b[1] - a[1])[0] || [""])[0];
+  for (let row = R - 1; row >= 0; row--) {
+    const list = [[row === R - 1 ? padL(fmt(mx), 6) + " ┤" : row === 0 ? padL("0", 6) + " ┤" : "       │", P.dim]];
+    for (const v of days) { const lv = v.tokens / mx * R - row; const ch = lv >= 1 ? "█" : lv > 0 ? vbarCh(lv) : " "; list.push([ch, v.d === D.todayISO ? P.hi : (v.est > v.tokens / 2 ? P.accD : mcol(topM(v)))]) }
+    out(list);
+  }
+  const axis = "└" + "─".repeat(n);
+  out([["       " + axis, P.dim]]);
+  const lab = (days[0].d.slice(5) + " ".repeat(n)).slice(0, Math.max(0, n - 5)) + "today";
+  out([["        " + lab, P.dim]]);
+}
+function exec(raw, user) {
+  const line = raw.trim();
+  say([[line, P.hi]], "cmd");
+  if (!line) return;
+  if (user) { if (hist[hist.length - 1] !== line) hist.push(line); histI = hist.length; autoPause = T() + 30; logScroll = 0 }
+  glowBoost = Math.max(glowBoost, .2);
+  const a = line.split(/\s+/), c = a[0].toLowerCase(), s1 = (a[1] || "").toLowerCase(), bw = phone ? 12 : 26;
+  const bad = msg => { out([[msg, P.bad]]); flashBad = T(); jolt = 1; glitch(.2) };
+  if (c === "help" || c === "?") {
+    const Hh = [["tb", "total today week month split peak rate streak"], ["tb models · tb model <name>", "the table / one model in detail"], ["tb day <date|today|yesterday|peak>", "one day, by model"],
+      ["tb top [n] · tb chart [days]", "biggest days / bar chart in the log"], ["tb forecast", "when the next milestones land"], ["theme green|amber|white", "swap the phosphor (or the chin buttons)"],
+      ["crt on|off|grille|slot|nomask", "tube effects and mask"], ["font vt|mono · degauss · glitch", "typeface and tube tricks"], ["power · boot · clear · history", "session"], ["keys", "TAB complete · ↑↓ history · ^L clear · ^C cancel · PgUp/PgDn"]];
+    for (const [k, v] of Hh) out([[padR(k, phone ? 20 : 36), P.hi], [phone ? "" : v, P.dim]]);
+    return;
+  }
+  if (c === "tb") {
+    const sub = s1 || "total";
+    if (sub === "total") { out([["total   ", P.dim], [full(D.total), P.hi], [" tokens  ", P.dim], ["(" + fmt(D.total) + ")", P.fg]]); out([["today   ", P.dim], [full(D.today), P.acc], ["  week ", P.dim], [full(D.week), P.fg]]); return }
+    if (sub === "today") { dayOut(D.todayISO); out([["heat ", P.dim], [Math.round(D.intensity * 100) + "% ", P.acc], [hbarStr(D.intensity, bw), P.acc]]); return }
+    if (sub === "week") { const mx = Math.max(1, ...X.d7.map(v => v.tokens)); for (const v of X.d7) out([[v.d + " " + DOW[dateOf(v.d).getDay()], v.d === D.todayISO ? P.acc : P.dim], [padL(full(v.tokens), 15), P.fg], ["  " + hbarStr(v.tokens / mx, bw), v.est ? P.accD : P.fg]]); out([["Σ 7d ", P.dim], [full(D.week), P.hi]]); return }
+    if (sub === "month" || sub === "months") {
+      const mm = {}; for (const v of D.days) { const k = v.d.slice(0, 7); mm[k] = (mm[k] || 0) + v.tokens }
+      const ks = Object.keys(mm).sort(), mx = Math.max(1, ...Object.values(mm));
+      for (const k of ks) out([[MON[+k.slice(5) - 1] + " " + k.slice(0, 4), P.acc], [padL(full(mm[k]), 16), P.fg], ["  " + hbarStr(mm[k] / mx, bw), P.mid]]);
+      return;
+    }
+    if (sub === "split") { const f = D.measured / D.total, L2 = bw * 1.5 | 0; out([["measured  ", P.fg], [padL(full(D.measured), 15), P.hi], [padL(pct(f) + "%", 8), P.fg]]); out([["estimated ", P.acc], [padL(full(D.estimated), 15), P.hi], [padL(pct(1 - f) + "%", 8), P.acc]]); out([[hbarStr(f, L2), P.fg], ["▒".repeat(Math.max(0, L2 - Math.round(f * L2))), P.acc]]); return }
+    if (sub === "peak") { dayOut(X.peak.d); return }
+    if (sub === "rate") { out([["today avg ", P.dim], [fmt(D.today / minutesToday()) + "/min", P.hi], [" since 00:00", P.dim]]); out([["live      ", P.dim], [rateTxt || "waiting for a second poll (60 s)", rateTxt ? P.acc : P.dark]]); return }
+    if (sub === "streak") { out([["streak ", P.dim], [X.cur + " days", P.hi], ["  best ", P.dim], [X.best + " days", P.fg], ["  lit ", P.dim], [X.active + "/" + X.span, P.fg]]); return }
+    if (sub === "forecast") {
+      const rate = D.week / 7, nm = Math.ceil((D.total + 1) / 1e8) * 1e8, nb = Math.ceil((D.total + 1) / 1e9) * 1e9;
+      const td = dateOf(D.todayISO), dim = new Date(td.getFullYear(), td.getMonth() + 1, 0).getDate(), left = dim - td.getDate() + 1 - minutesToday() / 1440;
+      out([["7-day pace  ", P.dim], [fmt(rate) + "/day", P.hi], ["  (all-time " + fmt(X.avg) + "/day)", P.dim]]);
+      out([["next " + padR(fmt(nm), 7), P.acc], [" in " + fmt(nm - D.total) + "  ", P.dim], [etaTxt((nm - D.total) / rate), P.fg]]);
+      out([["next " + padR(fmt(nb), 7), P.acc], [" in " + fmt(nb - D.total) + "  ", P.dim], [etaTxt((nb - D.total) / rate), P.fg]]);
+      out([["month end   ", P.dim], ["~" + fmt(D.total + rate * left), P.hi], [" total at this pace", P.dim]]);
+      return;
+    }
+    if (sub === "chart") { const n = clamp(parseInt(a[2]) || (phone ? 30 : 60), 7, Math.max(7, (layout.log ? layout.log[2] : COLS) - 16)); chartOut(n); return }
+    if (sub === "models") { const top = D.models[0].tokens; D.models.forEach((m, i) => out([[padL(i + 1, 2) + " ", P.dark], [padR(low(m.name), 12), m.color], [padL(full(m.tokens), 14), P.fg], [padL(pct(m.share) + "%", 7), P.mid], ["  " + hbarStr(Math.sqrt(m.tokens / top), bw - 6), m.color]])); return }
+    if (sub === "model") {
+      const q = (a[2] || "").toLowerCase(); const m = D.models.find(m => slug(m.name) === q) || D.models.find(m => q && slug(m.name).startsWith(q));
+      if (!m) return bad("tb: no model '" + q + "' — TAB lists them");
+      const st = X.ms[m.name], mx = Math.max(1, ...st.trend);
+      out([[low(m.name), m.color], ["  " + full(m.tokens), P.hi], [" tokens  #" + st.rank + " of " + D.models.length + "  " + pct(m.share) + "%", P.dim]]);
+      out([["today ", P.dim], [st.today ? "+" + fmt(st.today) : "idle", st.today ? P.acc : P.dark], ["  7d ", P.dim], [fmt(st.week), P.fg], ["  first seen ", P.dim], [st.first || "-", P.fg]]);
+      if (st.peak) out([["peak  ", P.dim], [st.peak.d + " " + fmt(st.peak.t), P.fg], ["  14d ", P.dim], [st.trend.map(v => v ? vbarCh(Math.max(.13, v / mx)) : "▁").join(""), m.color]]);
+      return;
+    }
+    if (sub === "day") {
+      let q = (a[2] || "today").toLowerCase();
+      if (q === "today") q = D.todayISO; else if (q === "yesterday") q = X.back(1); else if (q === "peak") q = X.peak.d;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(q)) return bad("tb: date as YYYY-MM-DD, today, yesterday or peak");
+      dayOut(q); return;
+    }
+    if (sub === "top") { const n = clamp(parseInt(a[2]) || 5, 1, 12); const t = D.days.slice().sort((p, q) => q.tokens - p.tokens).slice(0, n), mx = t[0] ? t[0].tokens : 1; t.forEach((v, i) => out([[padL(i + 1, 2) + " ", P.dark], [v.d, P.acc], [padL(full(v.tokens), 15), P.fg], ["  " + hbarStr(v.tokens / mx, bw), v.est ? P.accD : P.fg]])); return }
+    return bad("tb: unknown subcommand '" + sub + "' — try help");
+  }
+  if (c === "theme" || c === "phosphor") { const n = s1 === "ice" ? "white" : s1; if (!THEMES[n]) return bad(c + ": green, amber or white"); setTheme(n); out([["phosphor -> ", P.dim], [P.name, P.hi]]); return }
+  if (c === "font") { if (!FONTS[s1]) return bad("font: vt (VT323) or mono (JetBrains Mono)"); fontMode = s1; store.set("tb-ct-font", s1); resize(); out([["typeface -> ", P.dim], [FONTS[s1].name, P.hi], ["  " + COLS + "x" + ROWS, P.dim]]); return }
+  if (c === "crt") {
+    if (s1 === "on" || s1 === "off") { crtOn = s1 === "on"; out([["tube effects ", P.dim], [s1, P.hi]]); return }
+    const mi = { nomask: 0, grille: 1, slot: 2 }[s1];
+    if (mi == null) return bad("crt: on, off, grille, slot or nomask");
+    maskType = mi; store.set("tb-ct-mask", String(mi)); out([["mask -> ", P.dim], [["none", "aperture grille", "slot mask"][mi], P.hi]]); return;
+  }
+  if (c === "degauss") { wob = 1; glowBoost = 1; out([["*thunk* ", P.acc], ["degaussing coil fired", P.dim]]); return }
+  if (c === "glitch") { glitch(1); jolt = 1; out([["signal fault injected", P.mid]]); return }
+  if (c === "power") { togglePower(); return }
+  if (c === "rain") { if (s1 !== "on" && s1 !== "off") return bad("rain: on or off"); rainOn = s1 === "on"; out([["glyph rain ", P.dim], [s1, P.hi], [s1 === "on" ? " (behind the panels)" : "", P.dim]]); return }
+  if (c === "matrix") { matrixT = T(); out([["rain burst · density follows today's heat (" + Math.round(D.intensity * 100) + "%)", P.mid]]); return }
+  if (c === "boot" || c === "reboot") { powerOff(() => { LOG.length = 0; phase = "wait"; bootSpeed = 1; maybeBoot(); bootSpeed = 1; power.dir = 1 }); return }
+  if (c === "clear") { LOG.length = 0; logScroll = 0; return }
+  if (c === "history") { hist.slice(-12).forEach((h, i) => out([[padL(hist.length - Math.min(12, hist.length) + i + 1, 4) + "  ", P.dark], [h, P.fg]])); return }
+  if (c === "date") { out([[new Date().toString(), P.fg]]); return }
+  if (c === "whoami") { out([["you · burning tokens since ", P.dim], [D.firstDay, P.fg], [" · " + fmt(D.total) + " and counting", P.acc]]); return }
+  if (c === "uptime") { out([["up " + X.span + " days · " + X.active + " lit · load " + D.intensity.toFixed(2), P.fg]]); return }
+  if (c === "echo") { out([[line.slice(5), P.fg]]); return }
+  if (c === "sudo") return bad("sudo: the tokens are already on fire");
+  if (c === "exit" || c === "logout") { out([["there is no exit. only burn.", P.acc]]); wob = .6; return }
+  bad(c + ": command not found — try help");
+}
+function powerOff(cb) { power.dir = -1; power.cb = cb }
+function togglePower() {
+  if (power.dir > 0) { powerOff(null); glitch(.3) }
+  else { power.dir = 1; glowBoost = 1; wob = .4 }
+}
+function setTheme(n) {
+  const old = P, map = new Map(); for (const k in old) if (typeof old[k] === "string" && !map.has(old[k])) map.set(old[k], THEMES[n][k]);
+  for (const l of LOG) for (const sg of l.list) if (map.has(sg[1])) sg[1] = map.get(sg[1]);
+  themeName = n; P = THEMES[n]; store.set("tb-ct-theme", n); seedRain(true); wob = Math.max(wob, .35); glitch(.35);
+  for (const b of document.querySelectorAll(".ph button")) b.setAttribute("aria-pressed", String(b.dataset.t === n));
+}
+function runTyped(cmdline) {
+  userTyped = true; demo.on = false; kbd.value = ""; let i = 0;
+  const step = () => { if (i <= cmdline.length) { kbd.value = cmdline.slice(0, i++); typeT = T(); jolt = .3; setTimeout(step, 14) } else { const v = kbd.value; kbd.value = ""; exec(v, true) } };
+  step();
+}
+const DEMO = ["help", "tb today", "tb model claude", "tb forecast", "tb top 3", "tb chart", "tb split", "tb day peak", "tb month", "tb streak"];
+function stepDemo(now, dt) {
+  if (phase !== "dash" || userTyped || kbd.value) { demo.on = false; return }
+  if (!demo.on) { if (now - dashT0 > 10 && now - lastInput > 10) { demo.on = true; demo.s = ""; demo.t = 0 } return }
+  demo.t += dt; const target = DEMO[demo.i % DEMO.length];
+  const n = Math.min(target.length, Math.floor(demo.t * 12));
+  demo.s = target.slice(0, n); if (n > 0 && n !== demo.n) { typeT = now; demo.n = n }
+  if (n >= target.length && demo.t > target.length / 12 + .6) { exec(target, false); demo.i++; demo.on = false; lastInput = now - 2 }
+}
+
+/* ---------------- tooltip ---------------- */
+function tooltip(now) {
+  if (!hover || (phone && now > hoverUntil)) return;
+  let lines = null, title = "";
+  if (hover.kind === "day") {
+    const v = X.by[hover.data], dt = dateOf(hover.data); title = hover.data + " " + DOW[dt.getDay()];
+    if (!v) lines = [[["no tokens burned", P.dim]]];
+    else {
+      lines = [[[full(v.tokens), P.hi], [" tokens", P.dim]]];
+      if (v.est) lines.push([["≈ " + pct(v.est / v.tokens) + "% estimated", P.accD]]);
+      const ent = Object.entries(v.byModel).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      for (const [m, t] of ent) lines.push([["■ ", mcol(m)], [padR(low(m), 11), P.mid], [padL(fmt(t), 7), P.fg]]);
+      lines.push([["click: tb day", P.dark]]);
+    }
+  } else if (hover.kind === "model") {
+    const m = D.models.find(m => m.name === hover.data), st = X.ms[m.name]; title = low(m.name);
+    lines = [[[full(m.tokens), P.hi]], [["share ", P.dim], [pct(m.share) + "%", P.fg], ["  #" + st.rank, P.dim]], [["today ", P.dim], [st.today ? "+" + fmt(st.today) : "idle", st.today ? P.acc : P.dark]], [["7 days ", P.dim], [fmt(st.week), P.fg]], [["since ", P.dim], [st.first || "-", P.fg]], [["click: tb model", P.dark]]];
+  } else if (hover.kind === "split") {
+    title = "source integrity"; const f = D.measured / D.total;
+    lines = [[["measured  ", P.fg], [full(D.measured), P.hi]], [["estimated ", P.acc], [full(D.estimated), P.hi]], [[pct(f) + "% counted from logs", P.dim]], [["rest: old sessions, seats", P.dim]]];
+  } else if (hover.kind === "heat") {
+    title = "heat"; lines = [[["today's intensity ", P.dim], [Math.round(D.intensity * 100) + "%", P.acc]], [["log scale of today's burn;", P.dim]], [["drives glow, pace and the log", P.dim]]];
+  } else if (hover.kind === "total") {
+    title = "odometer"; lines = [[[full(D.total), P.hi]], [["next milestone ", P.dim], [fmt(Math.ceil((D.total + 1) / 1e8) * 1e8), P.acc]], [["click: tb total", P.dark]]];
+  } else return;
+  const wB = Math.max(title.length + 6, ...lines.map(l => segLen(l) + 4)), hB = lines.length + 2;
+  let tx = hover.cx + 2, ty = hover.cy + 1;
+  if (tx + wB > COLS - 1) tx = hover.cx - wB - 1; if (ty + hB > ROWS - 1) ty = ROWS - 1 - hB; tx = Math.max(0, tx); ty = Math.max(1, ty);
+  L1 = mkLayer(); use(L1);
+  fillBg(tx, ty, wB, hB, "rgba(0,0,0,.94)");
+  put(tx, ty, "╭" + "─".repeat(wB - 2) + "╮", P.mid); for (let j = 1; j < hB - 1; j++) { put(tx, ty + j, "│", P.mid); put(tx + wB - 1, ty + j, "│", P.mid) } put(tx, ty + hB - 1, "╰" + "─".repeat(wB - 2) + "╯", P.mid);
+  put(tx + 2, ty, " " + title + " ", P.acc);
+  lines.forEach((l, i) => segs(tx + 2, ty + 1 + i, l, wB - 4));
+  use(L0);
+}
+
+/* ---------------- glyph rain (events only) ---------------- */
+let drops = [];
+function seedRain(recolor) {
+  if (!D || !COLS) return;
+  const n = Math.round(COLS * (.12 + .7 * D.intensity));
+  const pool = D.models.map(m => [m.color, Math.sqrt(m.share)]), tot = pool.reduce((a, b) => a + b[1], 0);
+  const pick = () => { if (Math.random() < .6) return null; let r = Math.random() * tot; for (const [c, w] of pool) if ((r -= w) <= 0) return c; return null };
+  if (recolor) drops.forEach(p => p.col = pick());
+  while (drops.length < n) drops.push({ x: (Math.random() * COLS) | 0, y: -Math.random() * ROWS, v: 7 + Math.random() * 13 * (.5 + D.intensity), col: pick(), last: -1 });
+  if (drops.length > n) drops.length = n;
+}
+let rainAcc = 0;
+function stepRain(dt) {
+  rainAcc += dt; if (rainAcc < 1 / 30) return; const st = Math.min(.1, rainAcc); rainAcc = 0;
+  rc.setTransform(RS, 0, 0, RS, 0, 0);
+  rc.globalCompositeOperation = "destination-out"; rc.fillStyle = "rgba(0,0,0," + (.09 + st * 1.1).toFixed(3) + ")"; rc.fillRect(0, 0, GW, GH);
+  rc.globalCompositeOperation = "source-over"; rc.font = fs + "px " + F.stack; rc.textBaseline = "middle"; rc.textAlign = "center";
+  const burst = T() - matrixT < 6 ? 2 : 1;
+  for (const p of drops) {
+    p.y += p.v * st * burst; const cy = Math.floor(p.y);
+    if (cy !== p.last && cy >= 0) {
+      const X0 = OX + (p.x + .5) * cw;
+      if (p.last >= 0) { rc.fillStyle = p.col || P.fg; rc.globalAlpha = .8; rc.fillText(rg(), X0, OY + (p.last + .5) * chh) }
+      rc.globalAlpha = 1; rc.fillStyle = P.hi; rc.fillText(rg(), X0, OY + (cy + .5) * chh); p.last = cy;
+    }
+    if (p.y > ROWS + 3) { p.y = -Math.random() * 12; p.x = (Math.random() * COLS) | 0; p.last = -1 }
+  }
+  rc.globalAlpha = 1;
+}
+
+/* ---------------- 2D text-mode render ---------------- */
+const BOX = { "─": [0, 1, 0, 1], "│": [1, 0, 1, 0], "┌": [0, 1, 1, 0], "┐": [0, 0, 1, 1], "└": [1, 1, 0, 0], "┘": [1, 0, 0, 1], "├": [1, 1, 1, 0], "┤": [1, 0, 1, 1], "┬": [0, 1, 1, 1], "┴": [1, 1, 0, 1], "┼": [1, 1, 1, 1], "┃": [3, 0, 3, 0],
+  "═": [0, 2, 0, 2], "║": [2, 0, 2, 0], "╔": [0, 2, 2, 0], "╗": [0, 0, 2, 2], "╚": [2, 2, 0, 0], "╝": [2, 0, 0, 2], "╞": [1, 2, 1, 0], "╡": [1, 0, 1, 2] };
+const ROUND = { "╭": [1, 1], "╮": [-1, 1], "╰": [1, -1], "╯": [-1, -1] };
+function drawSpecial(c, ch, X0, Y0, col) {
+  const code = ch.charCodeAt(0);
+  if (code < 0x2500) return false;
+  const b = BOX[ch], lw = LWc, cx = snap(X0 + cw / 2 - lw / 2), cy = snap(Y0 + chh / 2 - lw / 2), X1 = X0 + cw, Y1 = Y0 + chh;
+  c.fillStyle = col;
+  if (b) {
+    const g = Math.max(1.5, snap(Math.min(cw, chh) * .2));
+    const [u, r, d, l] = b;
+    const H1 = (x0, x1, y) => c.fillRect(Math.min(x0, x1), y, Math.abs(x1 - x0) + lw, lw), V1 = (y0, y1, x) => c.fillRect(x, Math.min(y0, y1), lw, Math.abs(y1 - y0) + lw);
+    if (u === 3) { c.fillRect(cx - lw * .5, Y0, lw * 2, chh); return true }
+    const dbl = u === 2 || r === 2 || d === 2 || l === 2;
+    if (!dbl || ch === "╞" || ch === "╡") {
+      if (u === 1) V1(Y0, cy, cx); if (d === 1) V1(cy, Y1, cx); if (l === 1) H1(X0, cx, cy); if (r === 1) H1(cx, X1, cy);
+      if (r === 2) { H1(cx, X1, cy - g); H1(cx, X1, cy + g) } if (l === 2) { H1(X0, cx, cy - g); H1(X0, cx, cy + g) }
+      return true;
+    }
+    if (ch === "═") { H1(X0, X1, cy - g); H1(X0, X1, cy + g); return true }
+    if (ch === "║") { V1(Y0, Y1, cx - g); V1(Y0, Y1, cx + g); return true }
+    const sx = r ? 1 : -1, sy = d ? 1 : -1, ex = sx > 0 ? X1 : X0, ey = sy > 0 ? Y1 : Y0;
+    for (const k of [-1, 1]) { const kx = cx + k * sx * g, ky = cy + k * sy * g; H1(kx, ex, ky); V1(ky, ey, kx) }
+    return true;
+  }
+  const rd = ROUND[ch];
+  if (rd) {
+    const [sx, sy] = rd, rr = Math.min(cw, chh) * .5, hx = cx + lw / 2, hy = cy + lw / 2;
+    c.strokeStyle = col; c.lineWidth = lw; c.beginPath();
+    c.moveTo(sx > 0 ? X1 : X0, hy); c.arcTo(hx, hy, hx, sy > 0 ? Y1 : Y0, rr); c.lineTo(hx, sy > 0 ? Y1 : Y0); c.stroke();
+    return true;
+  }
+  if (ch === "█") { c.fillRect(X0, Y0 + chh * .18, cw + .02, chh * .64); return true }
+  if (ch === "▀") { c.fillRect(X0, Y0, cw, chh / 2); return true }
+  if (ch === "▄") { c.fillRect(X0, Y0 + chh / 2, cw, chh / 2); return true }
+  if (ch === "░" || ch === "▒" || ch === "▓") { c.globalAlpha = ch === "░" ? .25 : ch === "▒" ? .5 : .78; c.fillRect(X0 + .5, Y0 + chh * .18, cw - 1, chh * .64); c.globalAlpha = 1; return true }
+  if (code >= 0x2581 && code <= 0x2587) { const hh = chh * .64 * (code - 0x2580) / 8; c.fillRect(X0 + .5, Y0 + chh * .82 - hh, cw - 1.5, hh); return true }
+  if (code >= 0x2589 && code <= 0x258F) { c.fillRect(X0, Y0 + chh * .18, cw * (0x2590 - code) / 8, chh * .64); return true }
+  if (ch === "▁") { c.fillRect(X0 + .5, Y0 + chh * .76, cw - 1.5, Math.max(1, chh * .06)); return true }
+  if (ch === "┄") { for (let i = 0; i < 3; i++) c.fillRect(X0 + i * cw / 3, cy, cw / 6, lw); return true }
+  if (ch === "■") { const s = Math.min(cw, chh) * .72; c.fillRect(X0 + (cw - s) / 2, Y0 + chh / 2 - s / 2, s, s); return true }
+  if (code >= 0x2800 && code <= 0x28FF) {
+    const bits = code - 0x2800, ds = Math.max(1.2, cw * .26), MAP = [[0, 0, 0x01], [0, 1, 0x02], [0, 2, 0x04], [1, 0, 0x08], [1, 1, 0x10], [1, 2, 0x20], [0, 3, 0x40], [1, 3, 0x80]];
+    for (const [dx, dy, m] of MAP) if (bits & m) c.fillRect(X0 + cw * (.22 + .5 * dx) - ds / 2, Y0 + chh * (.17 + .22 * dy) - ds / 2, ds, ds);
+    return true;
+  }
+  return false;
+}
+function drawLayer(c, L) {
+  for (let j = 0; j < ROWS; j++) {
+    let i = 0;
+    while (i < COLS) { const k = j * COLS + i, b = L.BG[k]; if (!b) { i++; continue } let e = i + 1; while (e < COLS && L.BG[j * COLS + e] === b) e++; c.fillStyle = b; c.fillRect(snap(pxX(i)), pxY(j), snap(pxX(e)) - snap(pxX(i)), chh); i = e }
+  }
+  c.textBaseline = "alphabetic"; c.font = fs + "px " + F.stack;
+  const base = Math.round((chh / 2 + fs * F.cap / 2) * RS) / RS;
+  for (let j = 0; j < ROWS; j++) {
+    const Y0 = pxY(j), ty = Y0 + base;
+    let run = "", runX = 0, runC = null;
+    const flush = () => { if (run) { c.textAlign = "left"; c.fillStyle = runC; c.fillText(run, runX, ty); run = "" } };
+    for (let i = 0; i < COLS; i++) {
+      const k = j * COLS + i, ch = L.CH[k], col = L.FG[k] || P.fg;
+      if (ch === " ") { flush(); continue }
+      const code = ch.charCodeAt(0);
+      if (code < 128) { if (run && col === runC) run += ch; else { flush(); run = ch; runX = snap(pxX(i)); runC = col } continue }
+      flush();
+      if (!drawSpecial(c, ch, pxX(i), Y0, col)) { c.textAlign = "center"; c.fillStyle = col; c.fillText(ch, pxX(i) + cw / 2, ty) }
+    }
+    flush();
+  }
+}
+function render2D(now) {
+  const c = sc;
+  c.setTransform(RS, 0, 0, RS, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = "source-over";
+  c.fillStyle = P.bg; c.fillRect(0, 0, GW, GH);
+  const burst = now - matrixT < 6;
+  const ra = phase !== "dash" ? 0 : burst ? .9 * (1 - (now - matrixT) / 6) : rainOn ? .32 : 0;
+  if (ra > 0) { const t0 = phone ? 1 : 2; c.save(); c.beginPath(); c.rect(OX, OY + t0 * chh, COLS * cw, (ROWS - t0 - 1) * chh); c.clip(); c.globalAlpha = ra; c.drawImage(rain, 0, 0, GW, GH); c.restore() }
+  drawLayer(c, L0);
+  for (const o of OPS) {
+    c.save();
+    if (o.rev < 1 && o.rect) { c.beginPath(); c.rect(o.rect.x, o.rect.y, o.rect.w, o.rect.h * clamp(o.rev * 1.15, 0, 1)); c.clip() }
+    try { o.fn(c) } catch (e) { console.error(e) }
+    c.restore();
+  }
+  if (burst) { c.globalAlpha = .45 * (1 - (now - matrixT) / 6); c.globalCompositeOperation = "lighter"; c.drawImage(rain, 0, 0, GW, GH); c.globalAlpha = 1; c.globalCompositeOperation = "source-over" }
+  if (L1) drawLayer(c, L1);
+}
+
+/* ---------------- compose ---------------- */
+let layout = {};
+function compose(now) {
+  clearGrid();
+  if (phase !== "dash") { drawBoot(now); return }
+  header(now);
+  let top = 1;
+  if (!phone) { ticker(now); top = 2 }
+  const PY = ROWS - 1;
+  if (!phone) {
+    const R = clamp(Math.round(COLS * .37), 44, 66), Lw = COLS - R - 1;
+    let nM = Math.min(D.models.length, 12), A = ROWS < 38 ? 9 : 11, B, C;
+    const avail = PY - top;
+    for (; ;) { B = nM + 5; C = avail - A - B; if (C >= 10 || nM <= 4) break; nM-- }
+    if (C < 10 && A > 9) { A = Math.max(9, A - (10 - C)); C = avail - A - B }
+    pTotal(0, top, Lw, A, now); pToday(Lw + 1, top, R, A, now);
+    pModels(0, top + A, Lw, B, nM, now); pBurn(Lw + 1, top + A, R, B, now);
+    pLog(0, top + A + B, Lw, C, now); pCal(Lw + 1, top + A + B, R, C, now);
+    layout.log = [0, top + A + B, Lw, C];
+  } else {
+    let y = top; let nM = Math.min(D.models.length, 10);
+    let hT = 6, hD = 5, hB = 6, hC = 7, hM = nM + 3;
+    let hL = PY - y - hT - hD - hM - hB - hC;
+    while (hL < 4 && nM > 4) { nM--; hM = nM + 3; hL++ }
+    if (hL > 7) { hD++; hL-- } if (hL > 7) { hB++; hL-- } if (hL > 8) { hC += Math.min(2, hL - 8); hL -= Math.min(2, hL - 8) }
+    if (hL > 12) { const ex = Math.min(3, hL - 12); hT += ex; hL -= ex }
+    pTotal(0, y, COLS, hT, now); y += hT;
+    pToday(0, y, COLS, hD, now); y += hD;
+    pModels(0, y, COLS, hM, nM, now); y += hM;
+    pBurn(0, y, COLS, hB, now); y += hB;
+    pCal(0, y, COLS, hC, now); y += hC;
+    pLog(0, y, COLS, PY - y, now); layout.log = [0, y, COLS, PY - y];
+  }
+  prompt(PY, now);
+  applyReveal();
+  if (glitchV > .25 && !RM) { const n = Math.round(COLS * glitchV * .6), row = (Math.random() * ROWS) | 0; for (let i = 0; i < n; i++) { const k = row * COLS + ((Math.random() * COLS) | 0); if (CH[k] !== " ") { CH[k] = rg(); FG[k] = P.hi } } }
+  tooltip(now);
+}
+
+/* ---------------- WebGL CRT ---------------- */
+let gl = null, glOK = false, PR = {}, TS, PT = [], pi = 0, BA, BB, BC, BD, BE, BF, srcAlloc = false;
+const VS = "attribute vec2 a;varying vec2 v;void main(){v=a*.5+.5;gl_Position=vec4(a,0.,1.);}";
+const FS_PERSIST = "precision mediump float;varying vec2 v;uniform sampler2D tC,tP;uniform vec3 dec;void main(){vec3 c=texture2D(tC,v).rgb;vec3 p=texture2D(tP,v).rgb*dec-vec3(.004);gl_FragColor=vec4(max(c,p),1.);}";
+const FS_DOWN = "precision mediump float;varying vec2 v;uniform sampler2D t;uniform vec2 ts;uniform float th;void main(){vec3 c=texture2D(t,v+ts*vec2(-1.,-1.)).rgb+texture2D(t,v+ts*vec2(1.,-1.)).rgb+texture2D(t,v+ts*vec2(-1.,1.)).rgb+texture2D(t,v+ts*vec2(1.,1.)).rgb;c*=.25;gl_FragColor=vec4(max(c-vec3(th),0.)*(1.+th),1.);}";
+const FS_BLUR = "precision mediump float;varying vec2 v;uniform sampler2D t;uniform vec2 dir;void main(){vec3 c=texture2D(t,v).rgb*.227027;c+=texture2D(t,v+dir*1.3846).rgb*.3162162;c+=texture2D(t,v-dir*1.3846).rgb*.3162162;c+=texture2D(t,v+dir*3.2308).rgb*.0702703;c+=texture2D(t,v-dir*3.2308).rgb*.0702703;gl_FragColor=vec4(c,1.);}";
+const FS_FINAL = `precision highp float;varying vec2 v;
+uniform sampler2D tS,tB1,tB2,tB3;uniform vec2 uRes,uSrc;uniform vec4 uImg;
+uniform float uMg,uRad,uLip,uD,uBody,uFp,uTime,uK,uPower,uFlick,uRoll,uMask,uMaskT,uScan,uScanP,uScanO,uNoise,uGlow,uJolt,uWob,uCA,uGlitch,uRefl;
+uniform vec3 uTint,uBlack;
+float hash(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+vec2 warp(vec2 q){vec2 d=q-.5;float r2=dot(d,d);return .5+d*(1.+uK*r2)/(1.+uK*.25);}
+float rbox(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+vec2(r);return length(max(q,0.))+min(max(q.x,q.y),0.)-r;}
+vec2 rboxN(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+vec2(r);vec2 n=(q.x>0.&&q.y>0.)?normalize(q):(q.x>q.y?vec2(1.,0.):vec2(0.,1.));return n*sign(p+vec2(1e-5));}
+vec3 tap(vec2 u){vec2 a=vec2(.125,.375)*uFp/uSrc,b=vec2(.375,-.125)*uFp/uSrc;
+ return .25*(texture2D(tS,u+a).rgb+texture2D(tS,u-a).rgb+texture2D(tS,u+b).rgb+texture2D(tS,u-b).rgb);}
+void main(){
+ vec2 fc=gl_FragCoord.xy;vec2 hs=uImg.zw*.5;
+ vec2 q=(fc-uImg.xy)/uImg.zw;vec2 pq=(q-.5)*uImg.zw;
+ float sdO=rbox(pq,hs+vec2(uMg),uRad);
+ float sdB=rbox(fc-uRes*.5,uRes*.5-vec2(uD*.5),uBody);
+ vec3 col;
+ if(sdO<0.){
+  vec2 w=warp(q);
+  w.x+=uWob*.006*sin(w.y*38.+uTime*26.)*(1.+.5*sin(uTime*3.1));
+  w.x+=uJolt*.0008*sin(uTime*150.+w.y*11.);
+  float gt=floor(uTime*30.);
+  if(uGlitch>.001){float band=floor(w.y*22.+hash(vec2(gt,3.))*22.);float h=hash(vec2(band,gt));if(h>1.-uGlitch*.5)w.x+=(hash(vec2(gt,band+7.))-.5)*.07*uGlitch;}
+  vec2 dq=q-.5;
+  vec3 c=uBlack*(1.1-1.5*dot(dq,dq));
+  vec2 pw=(w-.5)*uImg.zw;float sdI=rbox(pw,hs,uRad*.55);
+  float edge=smoothstep(0.,1.6*uD,-sdI);
+  if(sdI<2.*uD){
+   float sy=mix(.004,1.,smoothstep(.2,.62,uPower)),sx=smoothstep(0.,.2,uPower);
+   float dy=(w.y-.5)/sy,dx=(w.x-.5)/max(sx,.001);
+   if(abs(dy)<.5&&abs(dx)<.5){
+    vec2 u=vec2(.5+dx,.5+dy);vec2 dd=u-.5;
+    vec2 cv=dd*uCA*(.3+3.4*dot(dd,dd))/uSrc*2.;
+    float gsh=uGlitch*.004*sin(uTime*90.);
+    vec3 im;im.g=tap(u).g;im.r=tap(u+cv+vec2(gsh,0.)).r;im.b=tap(u-cv-vec2(gsh,0.)).b;
+    float lum=dot(im,vec3(.3,.59,.11));
+    float yt=(1.-u.y)*uSrc.y-uScanO;
+    float s=.5-.5*cos(6.28318*yt/uScanP);
+    im*=mix(1.-uScan,1.,pow(s,1.1/(1.+lum*3.)));
+    float mp=max(1.,floor(uD+.5));float mx=floor(fc.x/mp);float m=mod(mx,3.);
+    vec3 mk=m<1.?vec3(1.,.28,.28):(m<2.?vec3(.28,1.,.28):vec3(.28,.28,1.));
+    if(uMaskT>1.5){float row=floor(fc.y/mp);float cell=floor(mx/3.);if(mod(row+(mod(cell,2.)<1.?0.:2.),4.)<1.)mk*=.4;}
+    im*=mix(vec3(1.),mk*1.78,uMask);
+    vec3 b1=texture2D(tB1,u).rgb,b2=texture2D(tB2,u).rgb,b3=texture2D(tB3,u).rgb;
+    im+=(b1*.42+b2*.42)*uGlow+b3*uGlow*.28*(.4+.6*uTint);
+    float band=fract(uTime*.065);float by=w.y-(1.2-band*1.4);
+    im*=1.+uRoll*(.06*exp(-by*by*220.)-.025*exp(-(by-.1)*(by-.1)*60.));
+    float fl=1.-smoothstep(.22,.8,uPower);im=mix(im,vec3(.85,1.,.9)*1.6,fl*.85);
+    c+=im*edge;
+   }
+  }
+  // halation leaking onto the dark glass margin
+  c+=texture2D(tB3,clamp(w,.002,.998)).rgb*uGlow*.3*(1.-edge)*exp(-max(sdI,0.)/(9.*uD))*uPower;
+  c*=uFlick;
+  float vig=pow(clamp(16.*w.x*w.y*(1.-w.x)*(1.-w.y),0.,1.),.28);c*=mix(.5,1.,vig);
+  // room reflections on the glass
+  vec2 wq=(q-vec2(.2,.83))*vec2(uImg.z/uImg.w,1.);
+  float win=rbox(wq,vec2(.16,.075),.03);
+  float mull=1.-.55*exp(-pow(wq.x/.006,2.))*step(win,0.);
+  c+=vec3(.75,.8,.86)*uRefl*(.045*exp(-max(win,0.)*22.)*mull+.012*smoothstep(.5,1.05,q.y));
+  vec2 sp=(q-vec2(.3,.72))*vec2(1.,1.3);c+=vec3(.6,.65,.7)*uRefl*.03*exp(-dot(sp,sp)*9.);
+  c+=vec3(.55,.6,.65)*uRefl*.045*exp(sdO/(16.*uD));
+  c*=.3+.7*smoothstep(0.,uMg*1.4+3.*uD,-sdO);
+  c+=(hash(fc+fract(uTime*13.1)*517.)-.5)*uNoise;
+  col=c;
+ }else{
+  float s=sdO/uD;vec2 n=rboxN(pq,hs+vec2(uMg),uRad);
+  float yy=fc.y/uRes.y;
+  vec3 pl=mix(vec3(.036,.038,.041),vec3(.082,.085,.089),pow(yy,1.3));
+  vec3 L=normalize(vec3(-.22,.9,.55));
+  if(s<uLip){
+   float t=s/uLip;
+   vec3 N=normalize(vec3(-n*(1.25-t*.7),1.));
+   float dif=max(dot(N,L),0.);
+   col=pl*(.2+1.25*dif);
+   vec2 mq=q-n*(2.*sdO+uMg*uD)/uImg.zw;
+   vec3 sg=texture2D(tB2,clamp(warp(mq),.002,.998)).rgb*uPower*uGlow;
+   col+=sg*(.75*pow(1.-t,2.)+.06);
+   col*=.35+.65*smoothstep(0.,1.4,s);
+   col+=vec3(.05)*exp(-pow((t-.82)/.1,2.))*max(dot(vec3(n,.4),L),0.);
+  }else{
+   float s2=s-uLip;
+   col=pl;
+   col+=vec3(.07)*exp(-s2*s2/2.5)*max(dot(normalize(vec3(n,.5)),L),0.);
+   col+=texture2D(tB3,clamp(warp(q),.002,.998)).rgb*uPower*uGlow*.12*exp(-s2/34.);
+   float gr=hash(floor(fc/max(1.,uD)));col*=.94+.08*gr;
+  }
+  float bs=-sdB/uD;
+  col*=.45+.55*smoothstep(0.,22.,bs);
+  col+=vec3(.06)*exp(-pow(bs-2.5,2.)/2.)*(.3+.7*yy);
+  if(sdB>0.)col=vec3(.016,.015,.014)*(1.+.6*yy);
+ }
+ col=max(col,0.);col=col/(1.+.22*col)*1.22;
+ col+=(hash(fc*.913+fract(uTime)*91.)-.5)/200.;
+ gl_FragColor=vec4(col,1.);
+}`;
+function shd(type, s) { const o = gl.createShader(type); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o }
+function mkProg(fsrc) {
+  const p = gl.createProgram(); gl.attachShader(p, shd(gl.VERTEX_SHADER, VS)); gl.attachShader(p, shd(gl.FRAGMENT_SHADER, fsrc)); gl.bindAttribLocation(p, 0, "a"); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  p.u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); for (let i = 0; i < n; i++) { const inf = gl.getActiveUniform(p, i); p.u[inf.name] = gl.getUniformLocation(p, inf.name) } return p;
+}
+function mkTex(w, h) { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); if (w) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); return t }
+function mkTarget(w, h) { w = Math.max(1, w | 0); h = Math.max(1, h | 0); const t = mkTex(w, h), f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0); gl.bindFramebuffer(gl.FRAMEBUFFER, null); return { t, f, w, h } }
+function freeTarget(T0) { if (T0) { gl.deleteTexture(T0.t); gl.deleteFramebuffer(T0.f) } }
+function initGL() {
+  try {
+    gl = crt.getContext("webgl", { alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false });
+    if (!gl) return false;
+    const qb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, qb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    PR.persist = mkProg(FS_PERSIST); PR.down = mkProg(FS_DOWN); PR.blur = mkProg(FS_BLUR); PR.fin = mkProg(FS_FINAL);
+    TS = mkTex(0, 0); return true;
+  } catch (e) { console.warn("CRT shader unavailable, flat mode:", e.message); gl = null; return false }
+}
+function glResize() {
+  [PT[0], PT[1], BA, BB, BC, BD, BE, BF].forEach(freeTarget);
+  const w = src.width, h = src.height, f = RS / dpr;   // bloom sized from screen pixels, not source
+  PT = [mkTarget(w, h), mkTarget(w, h)];
+  BA = mkTarget(w / 4 / f, h / 4 / f); BB = mkTarget(w / 4 / f, h / 4 / f); BC = mkTarget(w / 8 / f, h / 8 / f); BD = mkTarget(w / 8 / f, h / 8 / f); BE = mkTarget(w / 24 / f, h / 24 / f); BF = mkTarget(w / 24 / f, h / 24 / f);
+  srcAlloc = false;
+}
+function pass(p, tgt, texs, set) {
+  gl.useProgram(p); gl.bindFramebuffer(gl.FRAMEBUFFER, tgt ? tgt.f : null);
+  gl.viewport(0, 0, tgt ? tgt.w : crt.width, tgt ? tgt.h : crt.height);
+  texs.forEach((t, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, t) });
+  set(p.u); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+function renderGL(now, dt, uploaded) {
+  if (uploaded) {
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, TS); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    if (!srcAlloc) { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src); srcAlloc = true } else gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, src);
+  }
+  const A = PT[pi], Bt = PT[1 - pi]; pi = 1 - pi;
+  const k = t => RM ? 0 : Math.exp(-dt / t);
+  pass(PR.persist, Bt, [TS, A.t], u => { gl.uniform1i(u.tC, 0); gl.uniform1i(u.tP, 1); gl.uniform3f(u.dec, k(P.decay[0]), k(P.decay[1]), k(P.decay[2])) });
+  const dn = (s, d, th) => pass(PR.down, d, [s.t], u => { gl.uniform1i(u.t, 0); gl.uniform2f(u.ts, .5 / d.w, .5 / d.h); gl.uniform1f(u.th, th) });
+  const bl = (s, d, x, y) => pass(PR.blur, d, [s.t], u => { gl.uniform1i(u.t, 0); gl.uniform2f(u.dir, x / s.w, y / s.h) });
+  dn(Bt, BA, .04); bl(BA, BB, 1.1, 0); bl(BB, BA, 0, 1.1);
+  dn(BA, BC, 0); bl(BC, BD, 1.6, 0); bl(BD, BC, 0, 1.6);
+  dn(BC, BE, 0); bl(BE, BF, 2, 0); bl(BF, BE, 0, 2);
+  const I = D ? D.intensity : .3, on = crtOn ? 1 : 0;
+  const flick = RM || !on ? 1 : 1 + .007 * Math.sin(now * 377) + .004 * Math.sin(now * 61) + (Math.random() < .005 ? -.03 : 0);
+  const scanN = Math.max(1, Math.round(chh / (phone ? 2.4 : 3)));
+  pass(PR.fin, null, [Bt.t, BA.t, BC.t, BE.t], u => {
+    gl.uniform1i(u.tS, 0); gl.uniform1i(u.tB1, 1); gl.uniform1i(u.tB2, 2); gl.uniform1i(u.tB3, 3);
+    gl.uniform2f(u.uRes, crt.width, crt.height); gl.uniform2f(u.uSrc, src.width, src.height);
+    gl.uniform4f(u.uImg, IX * dpr, (H - IY - GH) * dpr, GW * dpr, GH * dpr);
+    gl.uniform1f(u.uMg, MG * dpr); gl.uniform1f(u.uRad, (phone ? 12 : 22) * dpr); gl.uniform1f(u.uLip, phone ? 5 : Math.round(BZ * .42)); gl.uniform1f(u.uBody, (phone ? 0 : 18) * dpr);
+    gl.uniform1f(u.uD, dpr); gl.uniform1f(u.uFp, RS / dpr);
+    gl.uniform1f(u.uTime, now % 1000); gl.uniform1f(u.uK, on * KW()); gl.uniform1f(u.uPower, power.v);
+    gl.uniform1f(u.uFlick, flick); gl.uniform1f(u.uRoll, RM ? 0 : on); gl.uniform1f(u.uMask, on * (maskType ? (dpr >= 1.5 ? .22 : .3) : 0)); gl.uniform1f(u.uMaskT, maskType);
+    gl.uniform1f(u.uScan, on * (phone ? .28 : .42)); gl.uniform1f(u.uScanP, chh * RS / scanN); gl.uniform1f(u.uScanO, OY * RS); gl.uniform1f(u.uNoise, on * .022);
+    gl.uniform1f(u.uGlow, .44 + .28 * I + glowBoost * .6); gl.uniform1f(u.uJolt, RM ? 0 : jolt); gl.uniform1f(u.uWob, RM ? 0 : wob);
+    gl.uniform1f(u.uCA, on * (.8 + wob * 6) * RS); gl.uniform1f(u.uGlitch, RM ? 0 : glitchV); gl.uniform1f(u.uRefl, on ? 1 : .5);
+    gl.uniform3f(u.uTint, P.glow[0], P.glow[1], P.glow[2]); gl.uniform3f(u.uBlack, P.black[0], P.black[1], P.black[2]);
+  });
+}
+
+/* ---------------- input ---------------- */
+function cellAt(mx, my) {
+  let qx = (mx - IX) / GW, qy = 1 - (my - IY) / GH;
+  if (glOK && crtOn) { const K = KW(), dx = qx - .5, dy = qy - .5, r2 = dx * dx + dy * dy, f = (1 + K * r2) / (1 + K * .25); qx = .5 + dx * f; qy = .5 + dy * f }
+  const sx = qx * GW, sy = (1 - qy) * GH;
+  return [Math.floor((sx - OX) / cw), Math.floor((sy - OY) / chh)];
+}
+function hitAt(cx, cy) { for (let i = HITS.length - 1; i >= 0; i--) { const h = HITS[i]; if (h.kind !== "panel" && cx >= h.x && cx < h.x + h.w && cy >= h.y && cy < h.y + h.h) return h } return null }
+function panelAt(cx, cy) { for (let i = HITS.length - 1; i >= 0; i--) { const h = HITS[i]; if (h.kind === "panel" && cx >= h.x && cx < h.x + h.w && cy >= h.y && cy < h.y + h.h) return h.data } return null }
+function updateHover() {
+  if (!mouse || phase !== "dash") { hover = null; return }
+  const [cx, cy] = cellAt(mouse[0], mouse[1]), h = hitAt(cx, cy);
+  hover = h && h.kind !== "log" && h.kind !== "prompt" ? { kind: h.kind, data: h.data, cx, cy, panel: panelAt(cx, cy) } : { kind: null, cx, cy, panel: panelAt(cx, cy) };
+  crt.style.cursor = h && (h.kind === "day" || h.kind === "model" || h.kind === "total" || h.kind === "split" || h.kind === "heat") ? "pointer" : "text";
+}
+crt.addEventListener("pointermove", e => { mouse = [e.clientX, e.clientY]; if (e.pointerType === "mouse") hoverUntil = 1e12 });
+crt.addEventListener("pointerleave", () => { mouse = null; hover = null });
+crt.addEventListener("pointerdown", e => {
+  lastInput = T();
+  if (power.dir < 0) { togglePower(); return }
+  if (phase === "boot" && bootPlan) { startDash(T()); return }
+  mouse = [e.clientX, e.clientY]; updateHover();
+  if (e.pointerType !== "mouse") hoverUntil = T() + 3.5;
+  const h = hover;
+  if (h && h.kind === "day") runTyped("tb day " + h.data);
+  else if (h && h.kind === "model") runTyped("tb model " + slug(h.data));
+  else if (h && h.kind === "total") runTyped("tb total");
+  else if (h && h.kind === "split") runTyped("tb split");
+  else if (h && h.kind === "heat") runTyped("tb today");
+  setTimeout(() => { try { kbd.focus({ preventScroll: true }) } catch (er) { } }, 0);
+});
+crt.addEventListener("wheel", e => {
+  const lg = layout.log; if (!lg || phase !== "dash") return;
+  const [cx, cy] = cellAt(e.clientX, e.clientY);
+  if (cx >= lg[0] && cx < lg[0] + lg[2] && cy >= lg[1] && cy < lg[1] + lg[3]) { e.preventDefault(); logScroll = clamp(logScroll + (e.deltaY > 0 ? -2 : 2), 0, Math.max(0, LOG.length - (lg[3] - 2))) }
+}, { passive: false });
+addEventListener("keydown", e => {
+  lastInput = T();
+  if (phase === "boot" && bootPlan) { startDash(T()); e.preventDefault(); return }
+  if (document.activeElement !== kbd && !e.metaKey && !e.altKey && !(e.target && e.target.tagName === "BUTTON")) { try { kbd.focus({ preventScroll: true }) } catch (er) { } }
+});
+kbd.addEventListener("keydown", e => {
+  lastInput = T();
+  if (phase !== "dash") return;
+  const k = e.key;
+  if (k === "Enter") { e.preventDefault(); const v = kbd.value; kbd.value = ""; userTyped = true; exec(v, true); jolt = 1; return }
+  if (k === "Tab") { e.preventDefault(); userTyped = true; kbd.value = complete(kbd.value); kbd.setSelectionRange(kbd.value.length, kbd.value.length); typeT = T(); jolt = .5; return }
+  if (k === "ArrowUp") { e.preventDefault(); if (hist.length) { histI = Math.max(0, histI - 1); kbd.value = hist[histI]; kbd.setSelectionRange(kbd.value.length, kbd.value.length) } return }
+  if (k === "ArrowDown") { e.preventDefault(); histI = Math.min(hist.length, histI + 1); kbd.value = hist[histI] || ""; return }
+  if (k === "PageUp" || k === "PageDown") { e.preventDefault(); const lg = layout.log; logScroll = clamp(logScroll + (k === "PageUp" ? 1 : -1) * (lg ? lg[3] - 3 : 5), 0, Math.max(0, LOG.length - 3)); return }
+  if (e.ctrlKey && (k === "l" || k === "L")) { e.preventDefault(); LOG.length = 0; logScroll = 0; return }
+  if (e.ctrlKey && (k === "c" || k === "C") && !kbd.value.slice(kbd.selectionStart, kbd.selectionEnd)) { e.preventDefault(); say([[kbd.value + "^C", P.dim]], "cmd"); kbd.value = ""; return }
+  if (e.ctrlKey && (k === "u" || k === "U")) { e.preventDefault(); kbd.value = ""; return }
+  if (k === "Escape") { kbd.value = ""; hover = null; return }
+});
+kbd.addEventListener("input", () => { userTyped = true; demo.on = false; typeT = T(); jolt = Math.max(jolt, .45); lastInput = T() });
+for (const b of document.querySelectorAll(".ph button")) b.addEventListener("click", () => { if (b.dataset.t !== themeName) { setTheme(b.dataset.t); if (phase === "dash") out([["phosphor -> ", P.dim], [P.name, P.hi]]) } });
+$("pwr").addEventListener("click", () => togglePower());
+addEventListener("resize", () => { resize() });
+let ledT = 0; function ledPulse() { ledT = T() }
+
+/* ---------------- loop ---------------- */
+function genStatus() {
+  const r = Math.random();
+  if (r < .25) return [["integrity :: measured ", P.mid], [pct(D.measured / D.total) + "%", P.fg], [" / estimated ", P.mid], [pct(D.estimated / D.total) + "%", P.acc]];
+  if (r < .5) { const nm = Math.ceil((D.total + 1) / 1e8) * 1e8; return [["next milestone :: ", P.mid], [fmt(nm), P.acc], [" in " + fmt(nm - D.total) + " · " + etaTxt((nm - D.total) / Math.max(1, D.week / 7)), P.mid]] }
+  if (r < .7) { const m = D.models[0]; return [["top burner :: ", P.mid], [low(m.name), m.color], [" " + pct(m.share) + "% share, " + fmt(m.tokens), P.mid]] }
+  if (r < .85) return [["week :: ", P.mid], [fmt(D.week), P.hi], [" over 7 days, avg " + fmt(D.week / 7) + "/day", P.mid]];
+  return [["poll /api/state ", P.dark], ["200", P.fg], [" total=" + full(D.total), P.mid]];
+}
+let last = T(), composeAcc = 1;
+function frame() {
+  requestAnimationFrame(frame);
+  const now = T();
+  if (document.hidden) { last = now; return }
+  const rdt = Math.min(.5, now - last), dt = Math.min(.1, rdt); last = now;
+  if (power.dir > 0) power.v = Math.min(1, power.v + rdt / (RM ? .25 : .95));
+  else { power.v = Math.max(0, power.v - rdt / .32); if (power.v <= 0 && power.cb) { const cb = power.cb; power.cb = null; setTimeout(cb, 260) } }
+  if (D && X) {
+    const p = clamp((now - animT0) / animDur, 0, 1), e = 1 - Math.pow(1 - p, 4);
+    shown = phase === "dash" ? (now < animT0 ? animFrom : animFrom + (animTo - animFrom) * e) : 0;
+    if (phase === "dash") {
+      const ms = Math.floor(shown / 1e8);
+      if (ms > lastMilestone) {
+        if (animFrom > 0) { const big = Math.floor(shown / 1e9) > Math.floor(animFrom / 1e9); alertT = now; alertMsg = big ? "!! " + fmt(Math.floor(shown / 1e9) * 1e9) + " TOKENS BURNED !!" : "MILESTONE " + fmt(ms * 1e8); say([["!! milestone :: total crossed ", P.acc], [fmt(ms * 1e8), P.hi]]); glowBoost = 1; matrixT = now; glitch(1); if (big) wob = 1 }
+        lastMilestone = ms;
+      }
+      if (now > nextAuto && now > autoPause && !logScroll) {
+        autoN++;
+        if (autoN % 4 === 0 || !D.days.length) say(genStatus());
+        else { const v = D.days[tailI % D.days.length]; tailI++; if (tailI >= D.days.length) tailI = Math.max(0, D.days.length - 21); say(dayLine(v), "replay") }
+        nextAuto = now + 3.8 - 2.2 * D.intensity + Math.random() * 1.4;
+      }
+    }
+    stepDemo(now, dt);
+  }
+  glowBoost = Math.max(0, glowBoost - dt * .9); jolt = Math.max(0, jolt - dt * 7); wob = Math.max(0, wob - dt * .8); glitchV = Math.max(0, glitchV - dt * 2.6);
+  if (D && (rainOn || now - matrixT < 6)) stepRain(dt);
+  composeAcc += dt;
+  let up = false;
+  if (composeAcc >= 1 / 30) { composeAcc = 0; updateHover(); compose(now); render2D(now); up = true }
+  if (glOK) renderGL(now, rdt, up);
+  const g = P.glow.map(v => Math.round(v * 255)).join(","), lv = D ? .3 + .7 * D.intensity : .2, act = Math.max(0, 1 - (now - ledT) * 4), pv = power.dir > 0 ? power.v : 0;
+  led.style.background = `rgba(${g},${Math.min(1, lv * (.6 + .4 * Math.sin(now * 2)) + act * .6) * pv + .08})`;
+  led.style.boxShadow = `0 0 ${4 + 8 * act}px rgba(${g},${(.4 + .6 * act) * pv})`;
+}
+
+glOK = initGL();
+if (!glOK) power.v = 1;
+resize();
+setTheme(themeName); glitchV = 0; wob = 0;
+phase = "wait"; bootT0 = T();
+TB.onData(onData);
+const fontWait = document.fonts && document.fonts.load ? Promise.all([document.fonts.load('20px "VT323"'), document.fonts.load('20px "JetBrains Mono"'), document.fonts.load('600 10px "Rajdhani"')]) : Promise.resolve();
+Promise.race([fontWait, new Promise(r => setTimeout(r, 2500))]).catch(() => { }).then(() => { fontOK = true; resize(); maybeBoot() });
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

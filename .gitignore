@@ -1,0 +1,18 @@
+# private: real counts and local caches never leave this computer
+state.json
+scan_cache.json
+inbox.csv
+*.tmp
+__pycache__/
+_site/
+# old copies, local notes, screenshots
+backup-*/
+*.bak
+index.html.with-shell
+index.html.no-shell
+screenshot.png
+designs/v1/
+designs/v2/
+designs/BRIEF.md
+designs/assets/test/
+tools/jobs/test.json

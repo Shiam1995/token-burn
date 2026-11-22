@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Living Star</title>
+<meta name="description" content="A roiling star whose sunspot groups and prominences are the models, whose heat is today's burn, and whose biggest days replay as solar flares.">
+<style>
+:root{
+  --ink:#f3ead9; --dim:#a08f78; --faint:#5e5244; --line:rgba(255,190,120,.16); --gold:#ffc46b; --hot:#ff8a3d;
+  --panel:rgba(14,8,6,.55);
+  --serif:"DejaVu Serif","Noto Serif","Liberation Serif",Georgia,serif;
+  --mono:"DejaVu Sans Mono","Noto Sans Mono","Liberation Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020104;color:var(--ink);font:12px/1.45 var(--mono);overflow:hidden}
+#stage{position:fixed;inset:0;background:#020104}
+#stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.lbl{color:var(--dim);font-size:10px;letter-spacing:.18em;text-transform:uppercase}
+.lbl b{color:var(--gold);font-weight:normal}
+#top{left:22px;top:20px}
+#brand{font-family:var(--serif);font-size:13px;letter-spacing:.32em;color:var(--gold);text-transform:uppercase}
+#total{font-family:var(--serif);font-size:50px;line-height:1.05;margin:8px 0 2px;font-variant-numeric:tabular-nums lining-nums;
+  color:#fff7e6;text-shadow:0 0 22px rgba(255,150,60,.65),0 0 3px rgba(255,240,210,.9);white-space:nowrap}
+#total small{font-family:var(--mono);font-size:13px;color:var(--dim);letter-spacing:.14em;margin-left:10px;text-shadow:none}
+#sub{display:flex;gap:24px;margin-top:8px;flex-wrap:wrap}
+#sub div>b{display:block;font-size:17px;font-weight:normal;color:#fff;font-variant-numeric:tabular-nums}
+#split{display:flex;height:7px;border-radius:4px;overflow:hidden;margin:6px 0 4px;background:#1a120c}
+#split span{display:block;height:100%}
+.row{display:flex;justify-content:space-between;gap:10px;color:var(--dim);font-size:11px}
+.row b{color:var(--ink);font-weight:normal}
+#mv{margin-top:12px;max-width:430px}
+#right{right:22px;top:20px;width:290px}
+.ar{display:grid;grid-template-columns:14px 1fr auto;gap:9px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,190,120,.06)}
+.ar i{width:12px;height:12px;border-radius:50%;position:relative}
+.ar i::after{content:"";position:absolute;inset:3px;border-radius:50%;background:#140804}
+.ar .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ar .n em{font-style:normal;color:var(--faint);font-size:10px;display:block;letter-spacing:.08em}
+.ar .v{text-align:right;color:#fff;font-variant-numeric:tabular-nums}
+.ar .v em{display:block;font-style:normal;color:var(--dim);font-size:10px}
+#cyc{left:22px;right:22px;bottom:16px;height:170px;padding:12px 16px 10px}
+#cycHead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+#cycCv{position:absolute;left:16px;right:16px;top:34px;bottom:10px;width:calc(100% - 32px);height:calc(100% - 44px)}
+#flareMsg{position:absolute;left:21%;top:59%;transform:translate(-50%,-50%);pointer-events:none;text-align:center;opacity:0;
+  font-family:var(--serif);font-size:30px;letter-spacing:.25em;color:#fff;text-shadow:0 0 20px #ff7a1a,0 0 50px #ff5a00;white-space:nowrap}
+#flareMsg small{display:block;font-family:var(--mono);font-size:12px;letter-spacing:.22em;color:var(--gold);margin-top:6px}
+#tip{position:fixed;pointer-events:none;background:rgba(20,10,6,.95);border:1px solid var(--gold);border-radius:6px;padding:6px 9px;font-size:11px;display:none;z-index:9;white-space:nowrap}
+#demo{color:var(--hot)}
+@media (max-width:1050px){ #right{width:240px} #total{font-size:40px} }
+@media (max-width:760px){
+  html,body{overflow:auto;height:auto}
+  #stage{position:relative;height:58vh;min-height:340px}
+  #top,#right,#cyc{position:relative;left:auto;right:auto;top:auto;bottom:auto;width:auto;margin:10px 16px}
+  #top{margin-top:-46px}
+  #total{font-size:31px}
+  #cyc{height:180px}
+  #flareMsg{font-size:17px;letter-spacing:.15em;top:12%;left:50%}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="gl"></canvas>
+  <canvas id="fx"></canvas>
+  <div id="flareMsg"></div>
+</div>
+
+<div class="panel" id="top">
+  <div id="brand">Token Burn · Stellar Observatory</div>
+  <div class="lbl" style="margin-top:8px">Luminosity · all tokens burned <span id="demo"></span></div>
+  <div id="total">0</div>
+  <div id="sub">
+    <div><span class="lbl">Irradiance today</span><b id="today">0</b></div>
+    <div><span class="lbl">Last 7 days</span><b id="week">0</b></div>
+    <div><span class="lbl">Surface temp</span><b id="temp">0 K</b></div>
+  </div>
+  <div id="mv">
+    <div class="lbl">Observed / modelled light</div>
+    <div id="split"></div>
+    <div class="row"><span><span style="color:var(--gold)">●</span> measured <b id="meas"></b></span><span><span style="color:#7a5a3a">●</span> estimated <b id="est"></b></span></div>
+  </div>
+</div>
+
+<div class="panel" id="right">
+  <div class="lbl">Active regions · <b>models</b></div>
+  <div id="regions" style="margin-top:6px"></div>
+  <div class="lbl" style="margin-top:8px;font-size:9px;color:var(--faint);letter-spacing:.1em">spot + prominence size ∝ share (smallest enlarged to stay visible)</div>
+</div>
+
+<div class="panel" id="cyc">
+  <div id="cycHead"><span class="lbl">Sunspot cycle · <b id="nDays">0</b> active days since <span id="first"></span></span>
+    <span class="lbl">bars = daily tokens · line = 7-day smoothed · ▲ flare class (M = 100M+, X = 1B+)</span></div>
+  <canvas id="cycCv"></canvas>
+</div>
+<div id="tip"></div>
+
+<script src="tb-data.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const glc = $("gl"), fx = $("fx"), fc = fx.getContext("2d");
+let W = 0, H = 0, DPR = 1, SX = 0, SY = 0, SR = 100, phone = false;
+let D = null, shown = 0, target = 0, heat = 0.5, heatT = 0.5, rot = 0, T = 0;
+let flash = 0, flashDir = [0, 0, 1], superFlash = 0;
+const hexRgb = h => { h = h.replace("#", ""); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255); };
+const fmtDate = s => new Date(s + "T00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+// ---------------- WebGL star ----------------
+const MAXS = 24;
+const gl = glc.getContext("webgl", { antialias: false, premultipliedAlpha: false });
+let prog = null, U = {};
+const VS = `attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}`;
+const FS = `precision highp float;
+uniform vec2 uRes; uniform vec2 uC; uniform float uR, uT, uRot, uHeat, uFlash, uSuper;
+uniform vec3 uFlashDir; uniform vec4 uSp[${MAXS}]; uniform vec3 uSc[${MAXS}]; uniform int uNS;
+float h31(vec3 p){p=fract(p*vec3(.1031,.1030,.0973));p+=dot(p,p.yxz+33.33);return fract((p.x+p.y)*p.z);}
+vec3 h33(vec3 p){p=vec3(dot(p,vec3(127.1,311.7,74.7)),dot(p,vec3(269.5,183.3,246.1)),dot(p,vec3(113.5,271.9,124.6)));return fract(sin(p)*43758.5453);}
+float h21(vec2 p){return fract(sin(dot(p,vec2(41.3,289.1)))*45758.5453);}
+float vn(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
+ return mix(mix(mix(h31(i),h31(i+vec3(1,0,0)),f.x),mix(h31(i+vec3(0,1,0)),h31(i+vec3(1,1,0)),f.x),f.y),
+            mix(mix(h31(i+vec3(0,0,1)),h31(i+vec3(1,0,1)),f.x),mix(h31(i+vec3(0,1,1)),h31(i+vec3(1,1,1)),f.x),f.y),f.z);}
+float fbm(vec3 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*vn(p);p=p*2.03+17.1;a*=.5;}return s;}
+vec2 worley(vec3 p){vec3 i=floor(p),f=fract(p);float d1=8.,d2=8.;
+ for(int z=-1;z<=1;z++)for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){vec3 g=vec3(x,y,z);vec3 o=h33(i+g);
+  o=.5+.42*sin(uT*.35+6.2831*o);float d=length(g+o-f);if(d<d1){d2=d1;d1=d;}else if(d<d2)d2=d;}
+ return vec2(d1,d2);}
+vec3 pal(float t){ // blackbody-ish ramp
+ t=clamp(t,0.,1.6);
+ vec3 c=mix(vec3(.25,.03,.0),vec3(.95,.28,.03),smoothstep(0.,.45,t));
+ c=mix(c,vec3(1.,.66,.2),smoothstep(.4,.8,t));
+ c=mix(c,vec3(1.,.93,.72),smoothstep(.78,1.1,t));
+ return mix(c,vec3(1.),smoothstep(1.1,1.6,t));}
+mat3 rotY(float a){float c=cos(a),s=sin(a);return mat3(c,0.,-s,0.,1.,0.,s,0.,c);}
+mat3 rotX(float a){float c=cos(a),s=sin(a);return mat3(1.,0.,0.,0.,c,s,0.,-s,c);}
+void main(){
+ vec2 fc=gl_FragCoord.xy; vec2 p=(fc-uC)/uR; float r=length(p);
+ vec3 col=vec3(0.);
+ // deep space: faint nebula + stars
+ vec2 q=fc/uRes.y;
+ float neb=fbm(vec3(q*2.2,uT*.01));
+ col+=vec3(.05,.02,.08)*neb*neb*1.6+vec3(.0,.015,.03)*fbm(vec3(q*4.,3.));
+ vec2 cell=floor(fc/3.); float st=h21(cell);
+ if(st>.9965){float tw=.55+.45*sin(uT*2.+st*100.);col+=vec3(.75,.8,1.)*tw*(st-.9965)*220.;}
+ float hz=.6+.4*uHeat;
+ if(r<1.){
+  float z=sqrt(1.-r*r); vec3 n=vec3(p,z);
+  vec3 nb=rotX(-.22)*n;                         // tilt the rotation axis toward us a little
+  float diff=uRot*(1.-.25*nb.y*nb.y);           // differential rotation
+  vec3 b=rotY(diff)*nb;                         // body frame
+  vec3 wp=b*5.+vec3(fbm(b*4.+uT*.03),fbm(b*4.+9.-uT*.025),0.)*.9; // domain-warped convection
+  float sup=fbm(wp+uT*.012);
+  vec2 w=worley(b*36.+vec3(sup*1.4,0.,uT*.02));
+  float cellB=1.-smoothstep(0.,.85,w.x);
+  float lane=smoothstep(0.,.14,w.y-w.x);
+  float gran=cellB*(.55+.45*lane);
+  float tt=.5+.26*gran+.42*(sup-.5)+.2*(fbm(b*11.-uT*.04)-.5);
+  tt*=.9+.1*lane;
+  tt*=.82+.32*uHeat;
+  // sunspots
+  vec3 tint=vec3(0.); float dark=1.;
+  for(int i=0;i<${MAXS};i++){ if(i>=uNS) break;
+   vec4 s=uSp[i]; float d=acos(clamp(dot(b,s.xyz),-1.,1.));
+   float wob=1.+.18*(vn(b*40.+float(i))-.5);
+   float pen=1.-smoothstep(s.w*.55,s.w*wob,d);
+   float umb=1.-smoothstep(s.w*.25,s.w*.48*wob,d);
+   float ring=smoothstep(s.w*.9,s.w*1.25,d)*(1.-smoothstep(s.w*1.25,s.w*2.6,d));
+   float fil=.75+.25*sin(atan(dot(b-s.xyz,cross(s.xyz,vec3(0,1,0))),b.y-s.y)*38.);
+   dark*=mix(1.,.5*fil,pen); dark*=mix(1.,.25,umb);
+   tint+=uSc[i]*(ring*.55+pen*(1.-umb)*.35);
+  }
+  tt*=dark;
+  vec3 c=pal(tt*1.3+.08*(1.-r*r));
+  c+=tint*(.5+.5*gran)*(.7+.6*uHeat);
+  // limb darkening, redder at the edge
+  float mu=z; c*=.28+.72*pow(mu,.5); c=mix(c*vec3(1.,.55,.3),c,smoothstep(0.,.45,mu));
+  // flare: blinding patch where it fires
+  float fd=acos(clamp(dot(b,uFlashDir),-1.,1.));
+  c+=vec3(1.,.95,.85)*uFlash*(exp(-fd*fd*180.)*3.+exp(-fd*fd*14.)*.45);
+  col=c*(1.+uSuper*.6);
+  // soft edge
+  col=mix(col,col*.6,smoothstep(.985,1.,r));
+ } else {
+  float d=r-1.; float a=atan(p.y,p.x);
+  float str=fbm(vec3(cos(a)*2.4,sin(a)*2.4,d*1.2-uT*.04));
+  float str2=pow(fbm(vec3(cos(a)*7.,sin(a)*7.,uT*.02)),2.);
+  float cor=exp(-d*9.)*1.1+exp(-d*3.)*.32*(.5+str*1.2)+exp(-d*1.1)*.14*str2*(.6+uHeat);
+  cor*=hz;
+  vec3 cc=mix(vec3(1.,.45,.12),vec3(1.,.85,.6),exp(-d*6.));
+  col+=cc*cor;
+  col+=vec3(1.,.6,.3)*uFlash*.25*exp(-d*2.);
+  col+=vec3(1.,.7,.4)*uSuper*exp(-d*1.5);
+ }
+ col=1.-exp(-col*1.25); // tone map
+ gl_FragColor=vec4(col,1.);
+}`;
+function mk(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+if (gl) {
+  try {
+    prog = gl.createProgram(); gl.attachShader(prog, mk(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, mk(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+    gl.useProgram(prog);
+    const bf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, bf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, "a"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    for (const n of ["uRes", "uC", "uR", "uT", "uRot", "uHeat", "uFlash", "uSuper", "uFlashDir", "uSp", "uSc", "uNS"]) U[n] = gl.getUniformLocation(prog, n);
+  } catch (e) { console.warn("WebGL star failed, using 2D", e); prog = null; }
+}
+const glFallback = !prog ? glc.getContext("2d") : null;
+
+// spots: built from models (body-frame unit vectors)
+let spots = [], spotFlat = new Float32Array(MAXS * 4), spotCol = new Float32Array(MAXS * 3);
+function buildSpots(models) {
+  spots = [];
+  const top = models.slice(0, 10);
+  top.forEach((m, i) => {
+    const lat = (i % 2 ? -1 : 1) * (0.2 + 0.25 * ((i * 0.618) % 1));   // two activity belts
+    const lon = i * 2.39996;                                             // golden-angle spread
+    const size = 0.035 + 0.17 * Math.sqrt(m.share);
+    const rgb = hexRgb(m.color);
+    const dir = (la, lo) => [Math.cos(la) * Math.sin(lo), Math.sin(la), Math.cos(la) * Math.cos(lo)];
+    spots.push({ m, i, dir: dir(lat, lon), size, rgb, lead: true });
+    if (spots.length < MAXS) spots.push({ m, i, dir: dir(lat + size * 0.3, lon - size * 2.1), size: size * 0.6, rgb, lead: false });
+    if (m.share > 0.04 && spots.length < MAXS) spots.push({ m, i, dir: dir(lat - size * 0.5, lon - size * 3.4), size: size * 0.38, rgb, lead: false });
+  });
+  spotFlat.fill(0); spotCol.fill(0);
+  spots.slice(0, MAXS).forEach((s, k) => { spotFlat.set([...s.dir, s.size], k * 4); spotCol.set(s.rgb, k * 3); });
+}
+// body -> view (inverse of shader transform) for labels
+function bodyToView(b) {
+  const diff = rot * (1 - 0.25 * b[1] * b[1]);
+  const c = Math.cos(-diff), s = Math.sin(-diff);
+  // rotY(-diff): GLSL mat3 column-major rotY(a) maps (x,z) -> (c x + s z, -s x + c z)
+  const x = c * b[0] + s * b[2], z = -s * b[0] + c * b[2], y = b[1];
+  // inverse of rotX(-.22) is rotX(.22)
+  const ca = Math.cos(0.22), sa = Math.sin(0.22);
+  return [x, ca * y - sa * z, sa * y + ca * z];
+}
+function viewToBody(v) {
+  const ca = Math.cos(-0.22), sa = Math.sin(-0.22);
+  const nb = [v[0], ca * v[1] - sa * v[2], sa * v[1] + ca * v[2]];
+  const diff = rot * (1 - 0.25 * nb[1] * nb[1]), c = Math.cos(diff), s = Math.sin(diff);
+  return [c * nb[0] + s * nb[2], nb[1], -s * nb[0] + c * nb[2]];
+}
+
+// ---------------- prominences (2D overlay) ----------------
+let proms = [];
+const PROM_ANG = [90, 200, 338, 55, 20, 178, 232, 300, 116, 266];
+function buildProms(models) {
+  const top = models.slice(0, 10), n = top.length;
+  proms = top.map((m, i) => {
+    // spread around the limb, keep the biggest on the upper right where there is room
+    const ang = PROM_ANG[i % PROM_ANG.length] * Math.PI / 180;
+    const h = 0.1 + 0.42 * Math.pow(m.share, 0.42);
+    const w = 0.07 + 0.22 * Math.pow(m.share, 0.35);
+    const cnt = Math.round(70 + 330 * Math.pow(m.share, 0.4));
+    const rgb = hexRgb(m.color).map(x => Math.round(x * 255));
+    const ps = [];
+    for (let k = 0; k < cnt; k++) ps.push({ u: Math.random(), sp: 0.05 + Math.random() * 0.09, off: (Math.random() - 0.5), strand: (Math.random() * 3) | 0 });
+    return { m, ang, h, w, rgb, ps, phase: Math.random() * 6 };
+  });
+}
+function promPt(pr, u, off, strand, t, o) {
+  // two feet on the limb, loop rising to height h, wobbling strands
+  const a0 = pr.ang - pr.w, a1 = pr.ang + pr.w;
+  const a = a0 + (a1 - a0) * u;
+  const lift = Math.sin(Math.PI * u);
+  const twist = Math.sin(u * 9 + t * 0.8 + strand * 2.1 + pr.phase) * 0.05 + off * 0.06;
+  const rr = 1 + pr.h * lift * (0.82 + 0.18 * Math.sin(t * 0.4 + pr.phase + strand)) + twist * lift;
+  const aa = a + twist * 0.6 * lift;
+  o[0] = SX + Math.cos(aa) * rr * SR; o[1] = SY - Math.sin(aa) * rr * SR; o[2] = lift;
+}
+const pp = [0, 0, 0];
+const dot = document.createElement("canvas"); dot.width = dot.height = 32;
+(() => { const g = dot.getContext("2d"), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(.3, "rgba(255,255,255,.4)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 32, 32); })();
+const tinted = {};
+function tintDot(rgb) {
+  const k = rgb.join(","); if (tinted[k]) return tinted[k];
+  const c = document.createElement("canvas"); c.width = c.height = 32; const g = c.getContext("2d");
+  g.drawImage(dot, 0, 0); g.globalCompositeOperation = "source-in";
+  // mix model colour with hydrogen-alpha red-orange so it still reads as hot plasma
+  const m = rgb.map((x, i) => Math.round(x * 0.7 + [255, 110, 60][i] * 0.3));
+  g.fillStyle = `rgb(${m})`; g.fillRect(0, 0, 32, 32);
+  return tinted[k] = c;
+}
+// CME burst particles
+let burst = [];
+function fireFlare(dayObj, cls) {
+  // pick a visible spot of the day's biggest model, else a random front-facing point
+  const top = Object.entries(dayObj.byModel).sort((a, b) => b[1] - a[1])[0];
+  let best = null;
+  for (const s of spots) { if (top && s.m.name !== top[0]) continue; const v = bodyToView(s.dir); if (v[2] > 0.25 && (!best || v[2] > best.v[2])) best = { s, v }; }
+  let v = best ? best.v : null;
+  if (!v) { const a = Math.random() * 6.28, r = Math.random() * 0.7; v = [Math.cos(a) * r, Math.sin(a) * r, Math.sqrt(1 - r * r)]; }
+  flashDir = viewToBody(v);
+  const mag = dayObj.tokens / 1e8;
+  flash = Math.min(1.6, 0.5 + mag * 0.15);
+  const x = SX + v[0] * SR, y = SY - v[1] * SR;
+  const rgb = top ? hexRgb(TB.color(top[0])).map(c => Math.round(c * 255)) : [255, 200, 120];
+  const nb = Math.min(260, 60 + mag * 30);
+  for (let i = 0; i < nb && burst.length < 900; i++) {
+    const a = Math.atan2(-v[1], v[0]) + (Math.random() - 0.5) * 2.2, sp = (0.25 + Math.random()) * SR * (0.35 + mag * 0.06);
+    burst.push({ x, y, vx: Math.cos(a) * sp, vy: -Math.sin(a) * sp, life: 1, rgb });
+  }
+  rings.push({ x, y, r: 0, a: 1 });
+  showMsg(`${cls} FLARE`, `${fmtDate(dayObj.d)} · ${TB.full(dayObj.tokens)} tokens`);
+}
+let rings = [];
+function showMsg(t, s) {
+  const e = $("flareMsg"); e.innerHTML = t + `<small>${s}</small>`;
+  e.animate([{ opacity: 0 }, { opacity: 1, offset: .12 }, { opacity: 1, offset: .65 }, { opacity: 0 }], { duration: 2600, easing: "ease-out" });
+}
+function flareClass(tok) {
+  if (tok >= 1e9) return "X" + (tok / 1e9).toFixed(1);
+  if (tok >= 1e8) return "M" + (tok / 1e8).toFixed(1);
+  if (tok >= 1e7) return "C" + (tok / 1e7).toFixed(1);
+  if (tok >= 1e6) return "B" + (tok / 1e6).toFixed(1);
+  return "A" + (tok / 1e5).toFixed(1);
+}
+
+function drawFX(dt, t) {
+  fc.setTransform(DPR, 0, 0, DPR, 0, 0);
+  fc.clearRect(0, 0, W, H);
+  fc.globalCompositeOperation = "lighter";
+  const sz = Math.max(3, SR * 0.04);
+  for (const pr of proms) { // faint loop strands give the arcs structure
+    for (let k = 0; k < 3; k++) {
+      fc.beginPath();
+      for (let j = 0; j <= 28; j++) { promPt(pr, j / 28, (k - 1) * 0.5, k, t, pp); j ? fc.lineTo(pp[0], pp[1]) : fc.moveTo(pp[0], pp[1]); }
+      fc.strokeStyle = `rgba(${pr.rgb.map((x, i) => Math.round(x * 0.6 + [255, 110, 60][i] * 0.4))},${0.10 + 0.08 * heat})`;
+      fc.lineWidth = Math.max(2, SR * 0.022); fc.stroke();
+    }
+  }
+  for (const pr of proms) {
+    const img = tintDot(pr.rgb);
+    const speed = 0.6 + 1.4 * heat;
+    for (const p of pr.ps) {
+      p.u += p.sp * dt * speed; if (p.u > 1) p.u -= 1;
+      promPt(pr, p.u, p.off, p.strand, t, pp);
+      const s = sz * (0.6 + 0.7 * pp[2]);
+      fc.globalAlpha = 0.18 + 0.5 * Math.sin(Math.PI * p.u);
+      fc.drawImage(img, pp[0] - s / 2, pp[1] - s / 2, s, s);
+    }
+  }
+  fc.globalAlpha = 1;
+  // flare rings + CME
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const r = rings[i]; r.r += dt * SR * 0.9; r.a -= dt * 0.7;
+    if (r.a <= 0) { rings.splice(i, 1); continue; }
+    fc.strokeStyle = `rgba(255,220,170,${r.a * 0.6})`; fc.lineWidth = 2 + 6 * r.a;
+    fc.beginPath(); fc.arc(r.x, r.y, r.r, 0, 6.283); fc.stroke();
+  }
+  for (let i = burst.length - 1; i >= 0; i--) {
+    const b = burst[i]; b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 0.985; b.vy *= 0.985; b.life -= dt * 0.45;
+    if (b.life <= 0) { burst.splice(i, 1); continue; }
+    fc.globalAlpha = b.life * 0.8; const s = sz * (0.5 + b.life);
+    fc.drawImage(tintDot(b.rgb), b.x - s / 2, b.y - s / 2, s, s);
+  }
+  fc.globalAlpha = 1;
+  fc.globalCompositeOperation = "source-over";
+  // labels: prominence apex + leader
+  fc.font = `${phone ? 9 : 11}px ${getComputedStyle(document.body).fontFamily}`;
+  fc.textBaseline = "middle";
+  for (const pr of proms) {
+    const a = pr.ang, r1 = 1 + pr.h + 0.06, r2 = r1 + 0.1;
+    const x1 = SX + Math.cos(a) * r1 * SR, y1 = SY - Math.sin(a) * r1 * SR;
+    const x2 = SX + Math.cos(a) * r2 * SR, y2 = SY - Math.sin(a) * r2 * SR;
+    const right = Math.cos(a) >= 0;
+    fc.strokeStyle = "rgba(255,210,160,.35)"; fc.lineWidth = 1;
+    fc.beginPath(); fc.moveTo(x1, y1); fc.lineTo(x2, y2); fc.lineTo(x2 + (right ? 14 : -14), y2); fc.stroke();
+    fc.textAlign = right ? "left" : "right";
+    const tx = x2 + (right ? 18 : -18);
+    fc.fillStyle = `rgb(${pr.rgb})`; fc.fillText(pr.m.name, tx, y2 - 6);
+    fc.fillStyle = "rgba(243,234,217,.75)"; fc.fillText(TB.fmt(pr.m.tokens), tx, y2 + 7);
+  }
+  // sunspot group tags on the visible disc (leading spots)
+  for (const s of spots) {
+    if (!s.lead || s.size < 0.05) continue;
+    const v = bodyToView(s.dir); if (v[2] < 0.3) continue;
+    const x = SX + v[0] * SR, y = SY - v[1] * SR;
+    fc.globalAlpha = Math.min(1, (v[2] - 0.3) * 3);
+    fc.strokeStyle = `rgba(${s.rgb.map(c => c * 255 | 0)},.8)`; fc.lineWidth = 1;
+    const rr = s.size * SR * 1.5 * v[2] + 4;
+    fc.beginPath(); fc.arc(x, y, rr, -0.6, 0.6); fc.stroke();
+    fc.textAlign = "left"; fc.fillStyle = "rgba(255,245,230,.9)";
+    fc.fillText("AR " + (4001 + s.i), x + rr + 4, y);
+    fc.globalAlpha = 1;
+  }
+}
+
+function drawGL() {
+  if (prog) {
+    gl.viewport(0, 0, glc.width, glc.height);
+    gl.uniform2f(U.uRes, glc.width, glc.height);
+    gl.uniform2f(U.uC, SX * DPR, (H - SY) * DPR);
+    gl.uniform1f(U.uR, SR * DPR);
+    gl.uniform1f(U.uT, T); gl.uniform1f(U.uRot, rot); gl.uniform1f(U.uHeat, heat);
+    gl.uniform1f(U.uFlash, flash); gl.uniform1f(U.uSuper, superFlash);
+    gl.uniform3fv(U.uFlashDir, flashDir);
+    gl.uniform4fv(U.uSp, spotFlat); gl.uniform3fv(U.uSc, spotCol); gl.uniform1i(U.uNS, Math.min(MAXS, spots.length));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  } else if (glFallback) {
+    const g = glFallback; g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.fillStyle = "#020104"; g.fillRect(0, 0, W, H);
+    const co = g.createRadialGradient(SX, SY, SR * 0.9, SX, SY, SR * 2.2);
+    co.addColorStop(0, "rgba(255,150,60,.6)"); co.addColorStop(1, "rgba(255,80,20,0)"); g.fillStyle = co; g.fillRect(0, 0, W, H);
+    const gr = g.createRadialGradient(SX, SY, 0, SX, SY, SR);
+    gr.addColorStop(0, "#fff3c8"); gr.addColorStop(.7, "#ffb347"); gr.addColorStop(1, "#c8460c");
+    g.fillStyle = gr; g.beginPath(); g.arc(SX, SY, SR, 0, 6.283); g.fill();
+    for (const s of spots) { const v = bodyToView(s.dir); if (v[2] < 0) continue; g.fillStyle = "rgba(40,10,0,.8)"; g.beginPath(); g.arc(SX + v[0] * SR, SY - v[1] * SR, s.size * SR * v[2], 0, 6.283); g.fill(); }
+  }
+}
+
+// ---------------- cycle chart ----------------
+const cv = $("cycCv"), cc = cv.getContext("2d");
+let play = -1, playT = 0, geo = null;
+function drawCycle(t) {
+  if (!D) return;
+  const r = cv.getBoundingClientRect(), w = r.width, h = r.height; if (!w) return;
+  if (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR)) { cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR); }
+  cc.setTransform(DPR, 0, 0, DPR, 0, 0); cc.clearRect(0, 0, w, h);
+  const days = D.days, n = days.length; if (!n) return;
+  const right = 44, top = 24, base = h - 14, ch = base - top;
+  const step = (w - right) / n, bw = Math.max(1, step * 0.62);
+  const sc = v => Math.sqrt(v / D.maxDay) * ch;
+  geo = { step, n };
+  cc.font = "9px " + getComputedStyle(document.body).fontFamily;
+  cc.fillStyle = "#5e5244"; cc.strokeStyle = "rgba(255,190,120,.08)";
+  for (const g of [0.1, 0.25, 0.5, 1]) { const y = base - Math.sqrt(g) * ch; cc.beginPath(); cc.moveTo(0, y + .5); cc.lineTo(w - right, y + .5); cc.stroke(); cc.fillText(TB.fmt(D.maxDay * g), w - right + 4, y + 3); }
+  const order = D.models.map(m => m.name);
+  const top3 = new Set(days.map((d, i) => [d.tokens, i]).sort((a, b) => b[0] - a[0]).slice(0, 3).map(x => x[1]));
+  for (let i = 0; i < n; i++) {
+    const d = days[i], x = i * step + (step - bw) / 2, th = sc(d.tokens);
+    let y = base;
+    const lit = i === play ? 1 : 0.78;
+    for (const nm of order) { const v = d.byModel[nm]; if (!v) continue; const hh = th * v / d.tokens; cc.globalAlpha = lit; cc.fillStyle = TB.color(nm); cc.fillRect(x, y - hh, bw, hh); y -= hh; }
+    cc.globalAlpha = 1;
+    if (d.est > 0) { // estimated share: darkened, dotted
+      const eh = th * d.est / d.tokens; cc.fillStyle = "rgba(10,5,2,.55)"; cc.fillRect(x, base - eh, bw, eh);
+      cc.fillStyle = "rgba(255,200,140,.35)"; for (let yy = base - 2; yy > base - eh; yy -= 4) cc.fillRect(x + bw / 2 - .5, yy, 1, 1);
+    }
+    if (d.tokens >= 1e8) { // flare marker
+      cc.fillStyle = i === play ? "#fff" : "#ffc46b";
+      const mx = x + bw / 2, my = base - th - 6;
+      cc.beginPath(); cc.moveTo(mx, my - 4); cc.lineTo(mx - 3.5, my + 2); cc.lineTo(mx + 3.5, my + 2); cc.fill();
+      if (top3.has(i) && step > 5) { cc.textAlign = "center"; cc.fillText(flareClass(d.tokens), mx, my - 9); cc.textAlign = "left"; }
+    }
+  }
+  // 7-day smoothed curve
+  cc.beginPath();
+  for (let i = 0; i < n; i++) {
+    let s = 0, c = 0; for (let j = Math.max(0, i - 3); j <= Math.min(n - 1, i + 3); j++) { s += days[j].tokens; c++; }
+    const x = i * step + step / 2, y = base - sc(s / c); i ? cc.lineTo(x, y) : cc.moveTo(x, y);
+  }
+  cc.strokeStyle = "rgba(255,240,200,.85)"; cc.lineWidth = 1.6; cc.shadowColor = "#ff9a40"; cc.shadowBlur = 8; cc.stroke(); cc.shadowBlur = 0;
+  // playhead
+  if (play >= 0) { const x = play * step + step / 2; cc.strokeStyle = "rgba(255,220,170,.6)"; cc.lineWidth = 1; cc.beginPath(); cc.moveTo(x, top - 10); cc.lineTo(x, base); cc.stroke(); }
+  cc.fillStyle = "#7d6b56";
+  cc.fillText(fmtDate(days[0].d), 0, h - 2);
+  if (n > 8) { const m = n >> 1; cc.fillText(fmtDate(days[m].d), m * step, h - 2); }
+  cc.textAlign = "right"; cc.fillText("today", w - right, h - 2); cc.textAlign = "left";
+}
+cv.addEventListener("mousemove", e => {
+  if (!D || !geo) return;
+  const r = cv.getBoundingClientRect(), i = Math.floor((e.clientX - r.left) / geo.step), d = D.days[i], tip = $("tip");
+  if (!d) { tip.style.display = "none"; return; }
+  const mods = Object.entries(d.byModel).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `<span style="color:${TB.color(k)}">●</span> ${k} ${TB.fmt(v)}`).join("<br>");
+  tip.innerHTML = `<b>${fmtDate(d.d)}</b> · class ${flareClass(d.tokens)}<br>${TB.full(d.tokens)} tokens${d.est ? ` <span style="color:var(--hot)">(${TB.fmt(d.est)} est.)</span>` : ""}<br>${mods}`;
+  tip.style.display = "block";
+  tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 12) + "px"; tip.style.top = (e.clientY - tip.offsetHeight - 10) + "px";
+});
+cv.addEventListener("mouseleave", () => $("tip").style.display = "none");
+
+// ---------------- data ----------------
+function setData(d) {
+  const first = !D; D = d;
+  $("demo").textContent = d.demo ? "· demo data" : "";
+  if (first) shown = Math.max(0, d.total - Math.max(d.today, d.total * 0.0015));
+  else if (d.total > target) { flash = 0.8; flashDir = viewToBody([0.2, 0.3, 0.93]); }
+  target = d.total;
+  heatT = Math.max(0.1, d.intensity);
+  buildSpots(d.models); buildProms(d.models);
+  $("today").textContent = TB.full(d.today);
+  $("week").textContent = TB.full(d.week);
+  $("temp").textContent = Math.round(4200 + 2600 * d.intensity).toLocaleString("en-GB") + " K";
+  const tot = d.measured + d.estimated || 1;
+  $("split").innerHTML = `<span style="width:${d.measured / tot * 100}%;background:linear-gradient(90deg,#ff9a3d,#ffe2a0)"></span><span style="width:${d.estimated / tot * 100}%;background:repeating-linear-gradient(90deg,#7a5a3a 0 2px,#3a2818 2px 4px)"></span>`;
+  $("meas").textContent = TB.fmt(d.measured) + " (" + (d.measured / tot * 100).toFixed(0) + "%)";
+  $("est").textContent = TB.fmt(d.estimated) + " (" + (d.estimated / tot * 100).toFixed(0) + "%)";
+  $("regions").innerHTML = d.models.slice(0, 10).map((m, i) =>
+    `<div class="ar"><i style="background:${m.color};box-shadow:0 0 9px ${m.color}"></i><span class="n">${m.name}<em>AR ${4001 + i}</em></span><span class="v">${TB.fmt(m.tokens)}<em>${(m.share * 100).toFixed(m.share < 0.01 ? 2 : 1)}%</em></span></div>`).join("");
+  $("nDays").textContent = d.days.length; $("first").textContent = fmtDate(d.firstDay);
+}
+
+// ---------------- layout + loop ----------------
+function resize() {
+  phone = innerWidth <= 760;
+  DPR = Math.min(phone ? 2 : 1.5, devicePixelRatio || 1);
+  const st = $("stage").getBoundingClientRect(); W = st.width; H = st.height;
+  for (const c of [glc, fx]) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); }
+  if (phone) { SR = Math.min(W * 0.27, H * 0.3); SX = W / 2; SY = H * 0.47; }
+  else {
+    SR = Math.max(110, Math.min((H - 200) * 0.29, W * 0.15));
+    SX = W * 0.54; SY = (H - 190) / 2 + 18;
+  }
+}
+addEventListener("resize", resize);
+let last = performance.now(), lastM = -1;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (document.hidden) { last = now; return; }
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; T += dt;
+  heat += (heatT - heat) * Math.min(1, dt);
+  rot += dt * (0.025 + 0.03 * heat);
+  flash *= Math.pow(0.25, dt); superFlash *= Math.pow(0.3, dt);
+  if (D) {
+    const prev = shown; shown += (target - shown) * Math.min(1, dt * 1.6); if (target - shown < 1) shown = target;
+    const a = Math.floor(prev / 1e9), b = Math.floor(shown / 1e9);
+    if (lastM >= 0 && b > a) { superFlash = 1.2; showMsg("SUPERFLARE", TB.full(b * 1e9) + " tokens burned"); }
+    lastM = b;
+    $("total").innerHTML = TB.full(shown) + "<small>TOKENS</small>";
+    // replay the cycle: 0.32 s per day, flare on M-class days
+    playT += dt;
+    const per = 0.32, n = D.days.length, cyc = n * per + 3;
+    const pos = (playT % cyc) / per | 0;
+    const np = pos < n ? pos : -1;
+    if (np !== play) { play = np; if (play >= 0 && D.days[play].tokens >= 1e8) fireFlare(D.days[play], flareClass(D.days[play].tokens)); }
+  }
+  drawGL(); drawFX(dt, T);
+  if ((T * 20 | 0) % 2 === 0) drawCycle(T);
+}
+resize();
+TB.onData(setData);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

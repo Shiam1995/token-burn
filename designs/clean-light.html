@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clean Light Analytics</title>
+<meta name="description" content="A polished light-theme analytics dashboard: KPI cards, a stacked area chart of daily tokens by model with hover tooltips, a sorted model table with sparklines and a calendar heatmap.">
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --ink:#14171f; --ink2:#4a5263; --ink3:#727b8c; --line:#e4e7ec; --line2:#eef0f3;
+  --accent:#c2501a; --accent-soft:#fdeee5; --good:#16794c; --bad:#b42318;
+  --h0:#eef0f3; --h1:#fbd9c4; --h2:#f5ad82; --h3:#e8783f; --h4:#c2501a; --h5:#8a3410;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:Inter,"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.wrap{max-width:1280px;margin:0 auto;padding:22px 24px 40px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#f08a4b,#c2501a);display:grid;place-items:center;box-shadow:var(--shadow)}
+.logo svg{width:20px;height:20px}
+h1{font-size:19px;margin:0;font-weight:650;letter-spacing:-.01em}
+.sub{color:var(--ink3);font-size:13px}
+.hright{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--ink3);font-size:12.5px}
+.live{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border:1px solid var(--line);border-radius:99px;background:var(--card)}
+.dot{width:8px;height:8px;border-radius:50%;background:#18a058;position:relative}
+.dot::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid #18a058;opacity:0;animation:ping var(--ping,2.4s) ease-out infinite}
+@keyframes ping{0%{transform:scale(.4);opacity:.7}100%{transform:scale(1.4);opacity:0}}
+.demo{display:none;padding:3px 9px;border-radius:99px;background:#fff4d6;color:#7a5200;font-weight:600;font-size:11.5px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.kpis{display:grid;grid-template-columns:1.45fr 1.1fr 1.1fr 1.1fr 1.3fr;gap:14px;margin-bottom:14px}
+.kpi{padding:16px 18px 15px;min-width:0}
+.klabel{color:var(--ink3);font-size:12.5px;font-weight:550;display:flex;align-items:center;gap:6px}
+.kval{font-size:clamp(20px,1.85vw,25px);font-weight:650;letter-spacing:-.02em;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kval.big{font-size:clamp(24px,2.4vw,31px)}
+.kfoot{margin-top:6px;font-size:12.5px;color:var(--ink3);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:99px;font-weight:600;font-size:12px}
+.chip.up{background:#e7f6ee;color:var(--good)} .chip.down{background:#fdecea;color:var(--bad)} .chip.flat{background:var(--line2);color:var(--ink2)}
+.split{height:8px;border-radius:99px;background:var(--line2);overflow:hidden;display:flex;margin-top:12px}
+.split i{display:block;height:100%;transition:width 1.2s cubic-bezier(.2,.8,.2,1)}
+.legend2{display:flex;justify-content:space-between;margin-top:8px;font-size:12.5px;color:var(--ink2);gap:8px}
+.legend2 b{font-weight:600;color:var(--ink)}
+.sw{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;vertical-align:0}
+.grid2{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
+.panel{padding:16px 18px 14px;min-width:0}
+.phead{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.ptitle{font-weight:620;font-size:14.5px}
+.pnote{color:var(--ink3);font-size:12.5px}
+.seg{margin-left:auto;display:inline-flex;background:var(--line2);border-radius:8px;padding:2px}
+.seg button{border:0;background:transparent;font:inherit;font-size:12.5px;padding:4px 11px;border-radius:6px;color:var(--ink2);cursor:pointer;font-weight:550}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(16,24,40,.1)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.chartbox{position:relative;height:370px}
+.chartbox svg{display:block;width:100%;height:100%}
+.mlegend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12.5px;color:var(--ink2)}
+.tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(16,24,40,.12);padding:10px 12px;font-size:12.5px;min-width:190px;opacity:0;transition:opacity .12s;z-index:5}
+.tip h4{margin:0 0 6px;font-size:12.5px;font-weight:620}
+.tip .row{display:flex;justify-content:space-between;gap:14px;color:var(--ink2);padding:1px 0}
+.tip .row b{color:var(--ink);font-weight:600}
+.tip .tot{border-top:1px solid var(--line);margin-top:5px;padding-top:5px}
+table{width:100%;border-collapse:collapse}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink3);font-weight:600;text-align:left;padding:6px 6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid var(--line2);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+.mname{font-weight:560;white-space:nowrap}
+.rank{color:var(--ink3);width:22px}
+.sharebar{height:6px;background:var(--line2);border-radius:99px;overflow:hidden;width:64px;display:inline-block;vertical-align:middle;margin-left:8px}
+.sharebar i{display:block;height:100%;border-radius:99px}
+.spark{width:96px;height:26px;display:block}
+.heatwrap{overflow:hidden}
+.heat svg{display:block}
+.hlegend{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--ink3);margin-left:auto}
+.hlegend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.hbody{display:flex;gap:24px;align-items:flex-start}.heat{flex:0 1 auto;min-width:0}.facts{flex:1 1 300px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px;align-content:start}
+.fact{background:var(--bg);border-radius:9px;padding:9px 11px}
+.fact .l{font-size:11.5px;color:var(--ink3)} .fact .v{font-weight:620;font-size:14.5px;margin-top:1px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,30px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:.4s;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.2);z-index:9}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+footer{color:var(--ink3);font-size:12px;margin-top:16px;text-align:center}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.kpi.total{grid-column:span 3}.kpi.ms{grid-column:span 3}}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}.hbody{flex-direction:column}.heat{flex:none;max-width:100%}.facts{flex:none;width:100%}}
+@media (max-width:600px){
+  .wrap{padding:16px 16px 30px}
+  .kpis{grid-template-columns:1fr 1fr;gap:10px}.kpi.total,.kpi.ms,.kpi.since{grid-column:span 2}
+  .kpi{padding:13px 14px}.kval{font-size:19px}.kval.big{font-size:27px}
+  .chartbox{height:230px}.facts{grid-template-columns:1fr 1fr}
+  .spark{width:60px}.sharebar{display:none}.hide-s{display:none}
+  .hright .upd{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.2 1.2-3.6 2.4-4.6.2 1.7 1 2.7 2.1 3.1C11 9 11 6 12 3z"/></svg></div>
+    <div><h1>Token Burn</h1><div class="sub" id="range">Usage analytics</div></div>
+    <div class="hright"><span class="demo" id="demo">Sample data</span><span class="upd num" id="upd"></span><span class="live"><span class="dot"></span><span id="liveTxt">Live</span></span></div>
+  </header>
+
+  <section class="kpis">
+    <div class="card kpi total"><div class="klabel">Total tokens burned</div><div class="kval big num" id="kTotal">0</div><div class="kfoot"><span class="num" id="kTotalShort"></span><span id="kTotalNote"></span></div></div>
+    <div class="card kpi"><div class="klabel">Today</div><div class="kval num" id="kToday">0</div><div class="kfoot" id="kTodayFoot"></div></div>
+    <div class="card kpi"><div class="klabel">Last 7 days</div><div class="kval num" id="kWeek">0</div><div class="kfoot" id="kWeekFoot"></div></div>
+    <div class="card kpi since"><div class="klabel">Since 17 Nov</div><div class="kval num" id="kSince">0</div><div class="kfoot" id="kSinceFoot"></div></div>
+    <div class="card kpi ms"><div class="klabel">Measured vs estimated</div>
+      <div class="split"><i id="bMeas" style="width:0;background:#2f6fde"></i><i id="bEst" style="width:0;background:repeating-linear-gradient(45deg,#9db8ea 0 4px,#c8d7f3 4px 8px)"></i></div>
+      <div class="legend2"><span><span class="sw" style="background:#2f6fde"></span>Measured <b class="num" id="kMeas"></b></span><span><span class="sw" style="background:#a9c1ee"></span>Estimated <b class="num" id="kEst"></b></span></div>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="card panel">
+      <div class="phead"><span class="ptitle">Daily tokens by model</span><span class="pnote" id="chartNote"></span>
+        <div class="seg" role="group" aria-label="Range"><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="0" class="on">All</button></div></div>
+      <div class="chartbox" id="chartbox"><svg id="chart" role="img" aria-label="Stacked area chart of daily tokens by model"></svg><div class="tip" id="tip"></div></div>
+      <div class="mlegend" id="mlegend"></div>
+    </div>
+    <div class="card panel">
+      <div class="phead"><span class="ptitle">Models</span><span class="pnote">sorted by total · last 30 days trend</span></div>
+      <table><thead><tr><th class="rank">#</th><th>Model</th><th class="r">Tokens</th><th class="r">Share</th><th class="r">30d</th></tr></thead><tbody id="mtable"></tbody></table>
+    </div>
+  </section>
+
+  <section class="card panel heatwrap">
+    <div class="phead"><span class="ptitle">Activity calendar</span><span class="pnote" id="heatNote"></span>
+      <div class="hlegend">Less <i style="background:var(--h0)"></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i><i style="background:var(--h5)"></i> More</div></div>
+    <div class="hbody"><div class="heat" id="heat"></div>
+    <div class="facts" id="facts"></div></div>
+  </section>
+  <footer id="foot"></footer>
+</div>
+<div class="toast" id="toast"></div>
+<script src="tb-data.js"></script>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const NS="http://www.w3.org/2000/svg";
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const pd=s=>new Date(s+"T12:00:00");
+const nice=s=>{const t=pd(s);return t.getDate()+" "+MON[t.getMonth()]};
+const niceY=s=>{const t=pd(s);return DOW[t.getDay()]+" "+t.getDate()+" "+MON[t.getMonth()]+" "+t.getFullYear()};
+function shade(hex,k){const n=parseInt(hex.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;r=Math.round(r*k);g=Math.round(g*k);b=Math.round(b*k);return"rgb("+r+","+g+","+b+")"}
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+let D=null, range=0, series=[], seq=[];
+const shown={total:0,today:0,week:0,since:0}; let target={...shown}; let started=false;
+
+function fillDays(d){
+  const m={};d.days.forEach(x=>m[x.d]=x);
+  const out=[];let t=pd(d.firstDay);const end=pd(d.todayISO);
+  while(t<=end){const k=TB.iso(t);out.push(m[k]||{d:k,tokens:0,est:0,byModel:{}});t=new Date(t.getTime()+864e5)}
+  return out;
+}
+
+/* ---------- counters (time-based easing toward new targets) ---------- */
+let from={...shown},t0c=0;const DUR=1800;
+const ease=k=>1-Math.pow(1-k,3);
+function setTargets(t){from={...shown};target=t;t0c=performance.now();kick()}
+function paint(){
+  $("kTotal").textContent=TB.full(shown.total);
+  $("kToday").textContent=TB.full(shown.today);
+  $("kWeek").textContent=TB.full(shown.week);
+  $("kSince").textContent=TB.full(shown.since);
+}
+function tick(){
+  const k=Math.max(0,Math.min(1,(performance.now()-t0c)/DUR)),e=ease(k);
+  for(const key in target)shown[key]=from[key]+(target[key]-from[key])*e;
+  paint();
+  if(k<1&&!document.hidden)raf=requestAnimationFrame(tick);else{raf=0;if(k>=1){for(const key in target)shown[key]=target[key];paint()}}
+}
+let raf=0;function kick(){if(!raf)raf=requestAnimationFrame(tick);setTimeout(()=>{if(performance.now()-t0c>=DUR){for(const key in target)shown[key]=target[key];paint()}},DUR+60)}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)kick()});
+
+function chip(cur,prev){
+  if(!prev)return'<span class="chip flat">new</span>';
+  const p=(cur-prev)/prev*100;const c=Math.abs(p)<1?"flat":p>0?"up":"down";
+  return'<span class="chip '+c+'">'+(p>0?"▲":p<0?"▼":"")+" "+Math.abs(p).toFixed(Math.abs(p)<10?1:0)+'%</span>';
+}
+
+/* ---------- toast on milestones ---------- */
+let lastTotal=null;
+function milestone(prev,cur){
+  if(prev==null)return;
+  const step=cur>=1e9?1e8:1e7;
+  if(Math.floor(cur/step)>Math.floor(prev/step)){const m=Math.floor(cur/step)*step;toast("Milestone: "+TB.fmt(m)+" tokens burned")}
+}
+function toast(t){const e=$("toast");e.textContent=t;e.classList.add("show");setTimeout(()=>e.classList.remove("show"),4200)}
+
+/* ---------- stacked area ---------- */
+function drawChart(){
+  const svg=$("chart");const box=$("chartbox");const W=box.clientWidth,H=box.clientHeight;
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);svg.innerHTML="";
+  const data=range?seq.slice(-range):seq;
+  if(!data.length)return;
+  const mL=W<500?40:52,mR=10,mT=10,mB=26;const iw=W-mL-mR,ih=H-mT-mB;
+  const max=Math.max(1,...data.map(x=>x.tokens));
+  // nice ticks
+  const raw=max/4,mag=Math.pow(10,Math.floor(Math.log10(raw)));const stp=[1,2,2.5,5,10].map(k=>k*mag).find(k=>k>=raw);
+  const top=Math.ceil(max/stp)*stp;
+  const X=i=>mL+(data.length===1?iw/2:i/(data.length-1)*iw),Y=v=>mT+ih-v/top*ih;
+  const g=el("g",{},svg);
+  for(let v=0;v<=top+1;v+=stp){el("line",{x1:mL,x2:W-mR,y1:Y(v),y2:Y(v),stroke:v?"#eef0f3":"#d5d9e0","stroke-width":1},g);
+    const t=el("text",{x:mL-8,y:Y(v)+4,"text-anchor":"end","font-size":11,fill:"#727b8c",class:"num"},g);t.textContent=TB.fmt(v)}
+  // x labels: month starts or every N
+  const nlab=Math.max(2,Math.floor(iw/80));const every=Math.max(1,Math.ceil(data.length/nlab));
+  data.forEach((x,i)=>{if(i%every===0||i===data.length-1&&data.length-1-Math.floor((data.length-1)/every)*every>every*0.6){const t=el("text",{x:X(i),y:H-7,"text-anchor":i===0?"start":i===data.length-1?"end":"middle","font-size":11,fill:"#727b8c"},g);t.textContent=nice(x.d)}});
+  // stacks: bottom = biggest
+  const base=data.map(()=>0);
+  const defs=el("defs",{},svg);
+  series.forEach((s,si)=>{
+    const vals=data.map(x=>s.get(x));const y0=base.slice();const y1=base.map((b,i)=>b+vals[i]);
+    let dA="M"+X(0)+","+Y(y1[0]);for(let i=1;i<data.length;i++)dA+="L"+X(i)+","+Y(y1[i]);
+    for(let i=data.length-1;i>=0;i--)dA+="L"+X(i)+","+Y(y0[i]);dA+="Z";
+    const gid="ga"+si;const lg=el("linearGradient",{id:gid,x1:0,y1:0,x2:0,y2:1},defs);
+    el("stop",{offset:"0","stop-color":s.color,"stop-opacity":.9},lg);el("stop",{offset:"1","stop-color":s.color,"stop-opacity":.55},lg);
+    const p=el("path",{d:dA,fill:"url(#"+gid+")"},svg);
+    let dL="M"+X(0)+","+Y(y1[0]);for(let i=1;i<data.length;i++)dL+="L"+X(i)+","+Y(y1[i]);
+    el("path",{d:dL,fill:"none",stroke:shade(s.color,.72),"stroke-width":1.2,"stroke-linejoin":"round"},svg);
+    for(let i=0;i<data.length;i++)base[i]=y1[i];
+  });
+  // estimated hatch marker under axis
+  const estG=el("g",{},svg);
+  data.forEach((x,i)=>{if(x.est>0){const w=Math.max(2,iw/data.length*.8);el("rect",{x:X(i)-w/2,y:mT+ih+1,width:w,height:3,fill:"#a9c1ee"},estG)}});
+  // animate reveal
+  const clip=el("clipPath",{id:"rev"},defs);const cr=el("rect",{x:0,y:0,width:started?W:0,height:H},clip);
+  svg.querySelectorAll("path").forEach(p=>p.setAttribute("clip-path","url(#rev)"));
+  if(!started){started=true;const t0=performance.now();const an=()=>{const k=Math.max(0,Math.min(1,(performance.now()-t0)/1100));cr.setAttribute("width",W*(1-Math.pow(1-k,3)));if(k<1)requestAnimationFrame(an)};requestAnimationFrame(an);setTimeout(()=>cr.setAttribute("width",W),1250)}
+  // hover
+  const rule=el("line",{y1:mT,y2:mT+ih,stroke:"#14171f","stroke-width":1,"stroke-dasharray":"3 3",opacity:0},svg);
+  const dot=el("circle",{r:4,fill:"#fff",stroke:"#14171f","stroke-width":1.5,opacity:0},svg);
+  const hit=el("rect",{x:mL,y:mT,width:iw,height:ih,fill:"transparent"},svg);
+  const tip=$("tip");
+  function move(ev){
+    const r=svg.getBoundingClientRect();const px=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+    const i=Math.max(0,Math.min(data.length-1,Math.round((px-mL)/iw*(data.length-1))));const x=data[i];
+    rule.setAttribute("x1",X(i));rule.setAttribute("x2",X(i));rule.setAttribute("opacity",.5);
+    dot.setAttribute("cx",X(i));dot.setAttribute("cy",Y(x.tokens));dot.setAttribute("opacity",1);
+    const rows=series.map(s=>({s,v:s.get(x)})).filter(o=>o.v>0).sort((a,b)=>b.v-a.v);
+    tip.innerHTML="<h4>"+niceY(x.d)+"</h4>"+(rows.length?rows.map(o=>'<div class="row"><span><span class="sw" style="background:'+o.s.color+'"></span>'+esc(o.s.name)+'</span><b class="num">'+TB.full(o.v)+"</b></div>").join(""):'<div class="row">No usage</div>')+
+      '<div class="row tot"><span>Total'+(x.est?" (incl. "+TB.fmt(x.est)+" est.)":"")+'</span><b class="num">'+TB.full(x.tokens)+"</b></div>";
+    tip.style.opacity=1;const tw=tip.offsetWidth,th=tip.offsetHeight;let tx=X(i)+14;if(tx+tw>W)tx=X(i)-tw-14;if(tx<0)tx=Math.max(0,(W-tw)/2);
+    tip.style.left=tx+"px";tip.style.top=Math.max(0,Math.min(H-th,Y(x.tokens)-th/2))+"px";
+  }
+  function out(){tip.style.opacity=0;rule.setAttribute("opacity",0);dot.setAttribute("opacity",0)}
+  hit.addEventListener("mousemove",move);hit.addEventListener("touchstart",move,{passive:true});hit.addEventListener("touchmove",move,{passive:true});hit.addEventListener("mouseleave",out);
+  const tot=data.reduce((a,x)=>a+x.tokens,0);
+  $("chartNote").textContent=TB.fmt(tot)+" in "+data.length+" days";
+}
+
+/* ---------- model table ---------- */
+function drawTable(){
+  const last=seq.slice(-30);
+  $("mtable").innerHTML=D.models.map((m,i)=>{
+    const vals=last.map(x=>x.byModel[m.name]||0);const mx=Math.max(1,...vals);
+    const w=96,h=26;const pts=vals.map((v,j)=>[(j/(vals.length-1||1))*(w-2)+1,h-2-(v/mx)*(h-5)]);
+    const line=pts.map((p,j)=>(j?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1)).join("");
+    const area=line+"L"+(w-1)+","+(h-1)+"L1,"+(h-1)+"Z";
+    const c=m.color,sc=shade(c,.75);
+    return'<tr><td class="rank num">'+(i+1)+'</td><td class="mname"><span class="sw" style="background:'+c+'"></span>'+esc(m.name)+'</td><td class="r num" title="'+TB.full(m.tokens)+'">'+TB.fmt(m.tokens)+
+      '</td><td class="r num">'+(m.share*100).toFixed(m.share<.01?2:1)+'%<span class="sharebar"><i style="width:'+Math.max(2,m.share*100)+'%;background:'+c+'"></i></span></td><td class="r"><svg class="spark" viewBox="0 0 '+w+" "+h+'" preserveAspectRatio="none"><path d="'+area+'" fill="'+c+'" opacity=".18"/><path d="'+line+'" fill="none" stroke="'+sc+'" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg></td></tr>';
+  }).join("");
+}
+
+/* ---------- calendar heatmap ---------- */
+function drawHeat(){
+  const host=$("heat");const W=Math.min(host.parentNode.clientWidth,innerWidth>900?host.parentNode.clientWidth*.66:9999);
+  const first=pd(seq[0].d);const start=new Date(first.getTime()-((first.getDay()+6)%7)*864e5); // Monday
+  const weeks=Math.ceil((pd(D.todayISO)-start)/864e5/7+1/7);
+  const labW=28,gap=3;const cell=Math.max(8,Math.min(26,Math.floor((W-labW)/weeks)-gap));
+  const H=20+7*(cell+gap);const used=labW+weeks*(cell+gap);
+  const vals=seq.map(x=>x.tokens).filter(v=>v>0).sort((a,b)=>a-b);
+  const q=p=>vals[Math.min(vals.length-1,Math.floor(p*vals.length))]||1;
+  const cuts=[q(.2),q(.45),q(.7),q(.9)];
+  const lvl=v=>v<=0?0:v<=cuts[0]?1:v<=cuts[1]?2:v<=cuts[2]?3:v<=cuts[3]?4:5;
+  const map={};seq.forEach(x=>map[x.d]=x);
+  const VW=Math.min(W,used);let s='<svg viewBox="0 0 '+VW+" "+H+'" width="'+VW+'" height="'+H+'" style="max-width:100%;height:auto">';
+  ["Mon","","Wed","","Fri","",""].forEach((t,i)=>{if(t)s+='<text x="0" y="'+(20+i*(cell+gap)+cell*.75)+'" font-size="10.5" fill="#727b8c">'+t+"</text>"});
+  let lastM=-1;
+  for(let w=0;w<weeks;w++){
+    for(let dI=0;dI<7;dI++){
+      const t=new Date(start.getTime()+(w*7+dI)*864e5);const k=TB.iso(t);
+      if(k>D.todayISO)continue;const x=map[k];const l=x?lvl(x.tokens):0;const pre=k<D.firstDay;
+      if(dI===0&&t.getMonth()!==lastM&&t.getDate()<=7||w===0&&lastM<0){lastM=t.getMonth();s+='<text x="'+(labW+w*(cell+gap))+'" y="12" font-size="10.5" fill="#727b8c">'+MON[t.getMonth()]+"</text>"}
+      const isT=k===D.todayISO;
+      s+='<rect x="'+(labW+w*(cell+gap))+'" y="'+(20+dI*(cell+gap))+'" width="'+cell+'" height="'+cell+'" rx="'+Math.min(4,cell/4)+'" fill="'+(pre?"#f7f8fa":"var(--h"+l+")")+'"'+(isT?' stroke="#14171f" stroke-width="1.5"':"")+'><title>'+niceY(k)+": "+(x?TB.full(x.tokens)+" tokens":"no usage")+"</title></rect>";
+    }
+  }
+  host.innerHTML=s+"</svg>";
+  const active=seq.filter(x=>x.tokens>0).length;
+  $("heatNote").textContent=active+" active days of "+seq.length;
+  // facts
+  const best=seq.reduce((a,x)=>x.tokens>a.tokens?x:a,seq[0]);
+  let streak=0;for(let i=seq.length-1;i>=0&&seq[i].tokens>0;i--)streak++;
+  let longest=0,run=0;seq.forEach(x=>{run=x.tokens>0?run+1:0;longest=Math.max(longest,run)});
+  const avg=D.total/Math.max(1,active);
+  $("facts").innerHTML=[["Biggest day",TB.fmt(best.tokens)+" · "+nice(best.d)],["Average active day",TB.fmt(avg)],["Current streak",streak+" day"+(streak===1?"":"s")],["Longest streak",longest+" days"]].map(f=>'<div class="fact"><div class="l">'+f[0]+'</div><div class="v num">'+f[1]+"</div></div>").join("");
+}
+
+function render(d){
+  D=d;seq=fillDays(d);
+  const top=d.models.slice(0,6),rest=d.models.slice(6);
+  series=top.map(m=>({name:m.name,color:m.color,get:x=>x.byModel[m.name]||0}));
+  if(rest.length){const names=rest.map(m=>m.name);series.push({name:"Other",color:"#9aa4b5",get:x=>names.reduce((a,n)=>a+(x.byModel[n]||0),0)})}
+  $("mlegend").innerHTML=series.map(s=>'<span><span class="sw" style="background:'+s.color+'"></span>'+esc(s.name)+"</span>").join("")+'<span><span class="sw" style="background:#a9c1ee;height:3px;vertical-align:2px"></span>estimated days</span>';
+  $("demo").style.display=d.demo?"inline-block":"none";
+  $("range").textContent=nice(d.firstDay)+" – "+nice(d.todayISO)+" "+pd(d.todayISO).getFullYear()+" · "+d.models.length+" models";
+  $("upd").textContent="Updated "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+  document.documentElement.style.setProperty("--ping",(3.2-2.4*d.intensity).toFixed(2)+"s");
+  $("liveTxt").textContent=d.intensity>.85?"Live · busy":d.intensity>.6?"Live · active":"Live · quiet";
+  milestone(lastTotal,d.total);lastTotal=d.total;
+  if(!started){shown.total=d.total*0.985;shown.week=d.week*.9;shown.since=d.since*.9;shown.today=d.today*.6}
+  setTargets({total:d.total,today:d.today,week:d.week,since:d.since});
+  $("kTotalShort").textContent=TB.fmt(d.total);
+  $("kTotalNote").textContent="since "+nice(d.firstDay);
+  const yest=seq.length>1?seq[seq.length-2].tokens:0;
+  $("kTodayFoot").innerHTML=chip(d.today,yest)+"<span>vs yesterday "+TB.fmt(yest)+"</span>";
+  const prevW=seq.slice(-14,-7).reduce((a,x)=>a+x.tokens,0);
+  $("kWeekFoot").innerHTML=chip(d.week,prevW)+"<span>vs prior 7d</span>";
+  const sinceDays=Math.max(1,Math.round((pd(d.todayISO)-pd("2026-11-17"))/864e5)+1);
+  $("kSinceFoot").innerHTML="<span>"+TB.fmt(d.since/sinceDays)+" / day avg</span>";
+  const tot=d.measured+d.estimated||1;
+  $("bMeas").style.width=(d.measured/tot*100)+"%";$("bEst").style.width=(d.estimated/tot*100)+"%";
+  $("kMeas").textContent=TB.fmt(d.measured)+" ("+(d.measured/tot*100).toFixed(1)+"%)";
+  $("kEst").textContent=TB.fmt(d.estimated)+" ("+(d.estimated/tot*100).toFixed(1)+"%)";
+  drawChart();drawTable();drawHeat();
+  $("foot").textContent="Token Burn · local dashboard · "+(d.demo?"sample data":"refreshes every 60 s");
+}
+document.querySelectorAll(".seg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on",x===b));range=+b.dataset.r;if(D)drawChart()}));
+let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(D){drawChart();drawHeat()}},120)});
+TB.onData(render);
+})();
+</script>
+</body>
+</html>

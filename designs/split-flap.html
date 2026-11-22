@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Split-Flap Departures</title>
+<meta name="description" content="A railway-station split-flap departures board: the total and today clack over letter by letter, every model is a departure with its tokens and status, and the day history pages through a timetable under warm station lamps.">
+<style>
+:root{
+  --ink:#f4ead0; --amber:#ffb347; --amber2:#ff9a1f; --enamel:#16324f; --brass:#c9a24f;
+  --board:#101113; --flap1:#2b2b2e; --flap2:#1a1a1c; --wall:#24160f; --dim:#8f8678;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:#1a110c;color:var(--ink);font-family:"DejaVu Sans","Helvetica Neue",Arial,sans-serif;overflow-x:hidden}
+#bg,#dust{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;pointer-events:none}
+#glow{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 60% 70% at 25% 0,rgba(255,160,70,.22),transparent 70%),radial-gradient(ellipse 60% 70% at 78% 0,rgba(255,150,60,.2),transparent 70%);animation:flick 5s infinite;mix-blend-mode:screen}
+@keyframes flick{0%,100%{opacity:1}40%{opacity:.86}43%{opacity:.97}70%{opacity:.9}}
+.wrap{position:relative;z-index:1;will-change:transform;display:grid;grid-template-columns:minmax(0,1fr) 380px;grid-template-areas:"sign sign" "total clock" "dep tt" "tick tick";gap:14px;padding:14px 18px 16px;max-width:1400px;margin:0 auto;min-height:100vh;align-content:start}
+.sign{grid-area:sign;display:flex;align-items:center;gap:14px;background:linear-gradient(#1d4068,#122a45);border:3px solid #e9e2cf;border-radius:8px;padding:8px 16px;box-shadow:0 0 0 3px #122a45,0 8px 22px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.25)}
+.sign .logo{width:38px;height:38px;flex:none}
+.sign h1{margin:0;font-size:24px;letter-spacing:.14em;font-weight:700;color:#f6f1e4;white-space:nowrap}
+.sign .sub{font-size:12px;letter-spacing:.18em;color:#b9c8da;text-transform:uppercase}
+.sign .sp{flex:1}
+.sign .dclock{font:700 22px "DejaVu Sans Mono",monospace;color:var(--amber);text-shadow:0 0 8px rgba(255,160,40,.6);background:#0b0b0c;padding:4px 10px;border-radius:4px;border:1px solid #333}
+.btn{background:#0d1f33;color:#d7e2ef;border:1px solid #6f8bab;border-radius:5px;padding:6px 10px;font:600 12px inherit;letter-spacing:.08em;cursor:pointer}
+.btn[aria-pressed=true]{background:var(--amber);color:#221;border-color:var(--amber)}
+.panel{background:linear-gradient(#141518,#0d0e10);border-radius:10px;padding:12px 14px 14px;border:2px solid #3a3022;box-shadow:0 0 0 4px #20180f,0 0 0 5px #5a4628,0 14px 30px rgba(0,0,0,.6),inset 0 0 40px rgba(0,0,0,.7);min-width:0;position:relative}
+.panel:before{content:"";position:absolute;inset:-5px;border-radius:12px;pointer-events:none;box-shadow:inset 0 2px 0 rgba(255,210,140,.12)}
+.lbl{font-size:11px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;margin:0 0 6px;display:flex;justify-content:space-between;gap:8px}
+.lbl b{color:#d9c9a3;font-weight:600}
+.total{grid-area:total}
+.clockp{grid-area:clock;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px}
+#clock{width:170px;height:170px;display:block}
+.clockp .cap{font-size:11px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;text-align:center}
+.clockp .cap b{display:block;color:var(--amber);font:700 15px "DejaVu Sans Mono",monospace;letter-spacing:.06em;margin-top:3px}
+.dep{grid-area:dep}
+.tt{grid-area:tt;display:flex;flex-direction:column}
+.tick{grid-area:tick;background:#070707;border:2px solid #3a3022;border-radius:6px;overflow:hidden;height:38px;position:relative;box-shadow:inset 0 0 18px #000}
+.tick .msg{position:absolute;top:0;left:0;white-space:nowrap;font:700 20px/34px "DejaVu Sans Mono",monospace;color:var(--amber);text-shadow:0 0 6px rgba(255,150,30,.85);letter-spacing:.12em;will-change:transform}
+.tick:after{content:"";position:absolute;inset:0;background:radial-gradient(circle,transparent 45%,rgba(0,0,0,.55) 46%) 0 0/3px 3px;pointer-events:none}
+
+/* flaps */
+.row{display:flex;align-items:center;min-width:0;margin:2px 0}
+.grp{display:flex;flex:none}
+.gap{width:calc(var(--w)*.55);flex:none}
+.f{position:relative;width:var(--w);height:var(--h);margin:0 1px;font:700 calc(var(--h)*.74)/var(--h) "DejaVu Sans Mono","Liberation Mono",monospace;color:var(--ink);flex:none}
+.f>div{position:absolute;left:0;right:0;height:50%;overflow:hidden;background:linear-gradient(var(--flap1),var(--flap2));backface-visibility:hidden}
+.f .t,.f .ft{top:0;border-radius:3px 3px 0 0}
+.f .b,.f .fb{bottom:0;border-radius:0 0 3px 3px;background:linear-gradient(#222225,#161618)}
+.f span{display:block;height:var(--h);text-align:center}
+.f .b span,.f .fb span{margin-top:calc(var(--h)*-.5)}
+.f .ft{transform-origin:50% 100%;z-index:2;display:none}
+.f .fb{transform-origin:50% 0;z-index:2;display:none}
+.f:after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;margin-top:-.5px;background:#000;z-index:3;box-shadow:0 1px 0 rgba(255,255,255,.06)}
+.f:before{content:"";position:absolute;left:-1px;right:-1px;top:calc(50% - 2px);height:4px;z-index:4;background:linear-gradient(90deg,#555 0 2px,transparent 2px calc(100% - 2px),#555 calc(100% - 2px))}
+.f.yel{color:var(--amber)}
+.f.red{color:#ff6a4d}
+.f.grn{color:#9be38d}
+.big .f{border-radius:4px}
+.liv.boarding{animation:board 1.6s infinite}@keyframes board{50%{opacity:.35}}
+.liv{width:6px;align-self:stretch;border-radius:2px;margin-right:6px;flex:none}
+.hdr{display:flex;font-size:10px;letter-spacing:.16em;color:#a89a7d;text-transform:uppercase;margin:2px 0 4px}
+.hdr span{flex:none;overflow:hidden;white-space:nowrap}
+.split{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:11px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;flex-wrap:wrap}
+.bar{flex:1;min-width:120px;height:10px;border-radius:5px;background:#3a3a3e;overflow:hidden;display:flex;box-shadow:inset 0 1px 2px #000}
+.bar i{display:block;height:100%}
+#hist{width:100%;height:84px;display:block;margin-top:auto;border-radius:6px;background:#efe6cf}
+.poster{margin-top:10px;background:#efe6cf;color:#2a241b;border-radius:6px;padding:6px 8px 8px;box-shadow:inset 0 0 0 2px #c8b78f}
+.poster .lbl{color:#6a5a3d;margin-bottom:2px}
+.poster .lbl b{color:#2a241b}
+.tip{position:fixed;pointer-events:none;background:#111;color:var(--ink);border:1px solid var(--brass);padding:5px 8px;border-radius:4px;font:12px "DejaVu Sans Mono",monospace;display:none;z-index:9;white-space:nowrap}
+@media (max-width:900px){
+  .wrap{grid-template-columns:minmax(0,1fr);grid-template-areas:"sign" "total" "clock" "dep" "tt" "tick";padding:12px 16px;gap:12px}
+  .clockp{flex-direction:row}
+  #clock{width:130px;height:130px}
+  .sign h1{font-size:17px;letter-spacing:.08em}
+  .sign .sub{display:none}
+  .sign .dclock{font-size:15px}
+}
+@media (max-width:480px){.sign .logo{display:none}.sign{gap:8px;padding:8px 10px}.sign h1{font-size:14px;letter-spacing:.04em}.sign .dclock{font-size:12px;padding:3px 6px}.btn{padding:4px 6px;font-size:10px}.split .bar{flex-basis:100%}}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas><div id="glow"></div><canvas id="dust"></canvas>
+<div class="wrap">
+  <header class="sign">
+    <svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="#f6f1e4" stroke-width="3"/><path d="M20 6c5 7 9 10 9 16a9 9 0 0 1-18 0c0-4 2-6 4-8 0 3 1 5 3 6-1-5 0-9 2-14z" fill="#ff9a1f"/></svg>
+    <div><h1>TOKEN BURN CENTRAL</h1><div class="sub">Departures · all services</div></div>
+    <div class="sp"></div>
+    <div class="dclock" id="dclock">--:--</div>
+    <button class="btn" id="snd" aria-pressed="false" title="Flap clack sound">SOUND</button>
+  </header>
+
+  <section class="panel total">
+    <div class="lbl"><b>Total burned</b><span id="demo"></span></div>
+    <div class="row big" id="rTotal"></div>
+    <div class="lbl" style="margin-top:8px"><b>Today</b><span id="todayPct"></span></div>
+    <div class="row big" id="rToday"></div>
+    <div class="split">
+      <span>Measured</span><div class="row" id="rMeas"></div>
+      <span>Est.</span><div class="row" id="rEst"></div>
+      <div class="bar" id="mbar" title="measured vs estimated"><i style="background:#ffb347"></i><i style="background:repeating-linear-gradient(45deg,#6b6250 0 3px,#4a4438 3px 6px)"></i></div>
+    </div>
+    <div class="split" style="margin-top:10px"><span>Next milestone</span><b id="nextB" style="color:#d9c9a3;letter-spacing:.06em;font-family:DejaVu Sans Mono,monospace"></b>
+      <div class="bar"><i id="nbar" style="background:linear-gradient(90deg,#c8401e,#ffb347);box-shadow:0 0 8px #ff9a1f"></i></div><span id="nleft"></span></div>
+  </section>
+
+  <section class="panel clockp">
+    <canvas id="clock" width="380" height="380"></canvas>
+    <div class="cap">Platform clock<b id="wk">week —</b></div>
+  </section>
+
+  <section class="panel dep">
+    <div class="lbl"><b>Departures</b><span>destination = model · status by last service</span></div>
+    <div class="hdr" id="depHdr"></div>
+    <div id="depRows"></div>
+  </section>
+
+  <section class="panel tt">
+    <div class="lbl"><b>Timetable</b><span id="page">1/1</span></div>
+    <div class="hdr" id="ttHdr"></div>
+    <div id="ttRows"></div>
+    <div class="poster">
+      <div class="lbl"><b>Service history</b><span id="hspan"></span></div>
+      <canvas id="hist"></canvas>
+    </div>
+  </section>
+
+  <div class="tick" id="tick"><div class="msg" id="msg"></div></div>
+</div>
+<div class="tip" id="tip"></div>
+<script src="tb-data.js"></script>
+<script>
+(() => {
+const CH = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:%-/";
+const STEP = 66, HALF = 30;
+const cells = [];
+let clacks = 0, D = null, shownTotal = 0, fromTotal = 0, toTotal = 0, tStart = 0;
+const $ = id => document.getElementById(id);
+
+function mkCell(cls) {
+  const el = document.createElement("div"); el.className = "f" + (cls ? " " + cls : "");
+  el.innerHTML = '<div class="t"><span> </span></div><div class="b"><span> </span></div><div class="ft"><span> </span></div><div class="fb"><span> </span></div>';
+  const [t, b, ft, fb] = el.children;
+  const c = { el, t: t.firstChild, b: b.firstChild, ftEl: ft, fbEl: fb, ft: ft.firstChild, fb: fb.firstChild, cur: " ", target: " ", next: 0 };
+  cells.push(c); return c;
+}
+function setCell(c, ch, delay) {
+  ch = (ch || " ").toUpperCase(); if (CH.indexOf(ch) < 0) ch = "-";
+  if (c.target !== ch) { c.target = ch; if (c.cur === c.target) return; c.next = Math.max(c.next, performance.now() + (delay || 0)); }
+}
+const anim = new Set();
+function step(c, now) {
+  const old = c.cur, nx = CH[(CH.indexOf(old) + 1) % CH.length]; c.cur = nx;
+  c.t.textContent = nx; c.ft.textContent = old; c.fb.textContent = nx; c.b.textContent = old;
+  c.ftEl.style.transform = "scaleY(1)"; c.ftEl.style.display = "block"; c.fbEl.style.display = "none";
+  c.as = now; c.ph = 0; anim.add(c); clacks++;
+}
+function animate(now) {
+  for (const c of anim) {
+    const p = (now - c.as) / (2 * HALF);
+    if (p >= 1) { c.b.textContent = c.cur; c.ftEl.style.display = c.fbEl.style.display = "none"; anim.delete(c); continue; }
+    if (p < .5) { const k = 1 - p * 2; c.ftEl.style.transform = `scaleY(${(k * k).toFixed(3)})`; }
+    else { if (c.ph === 0) { c.ph = 1; c.ftEl.style.display = "none"; c.fbEl.style.display = "block"; } const k = (p - .5) * 2; c.fbEl.style.transform = `scaleY(${(1 - (1 - k) * (1 - k)).toFixed(3)})`; }
+  }
+}
+// a "field" is a run of cells; write(text, align)
+function field(parent, n, cls) {
+  const g = document.createElement("div"); g.className = "grp"; parent.appendChild(g);
+  const cs = []; for (let i = 0; i < n; i++) { const c = mkCell(cls); g.appendChild(c.el); cs.push(c); }
+  return { g, cs, write(s, right, delay = 0) {
+    s = String(s).toUpperCase().slice(0, n); if (right) s = s.padStart(n); else s = s.padEnd(n);
+    cs.forEach((c, i) => setCell(c, s[i], delay + i * 22));
+  }, color(cl) { cs.forEach(c => c.el.className = "f" + (cl ? " " + cl : "")); } };
+}
+function gap(parent) { const s = document.createElement("div"); s.className = "gap"; parent.appendChild(s); }
+
+// ---------- layout ----------
+let narrow = null, F = {};
+function avail(el) { const cs = getComputedStyle(el); return el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight); }
+function sizeRow(row, n, maxW, gaps = 0, base) {
+  const w = Math.max(8, Math.min(maxW, Math.floor((avail(base || row.parentElement) - (row.dataset.pad | 0)) / (n + gaps * .55) - 2)));
+  row.style.setProperty("--w", w + "px"); row.style.setProperty("--h", Math.round(w * 1.42) + "px");
+  return w;
+}
+const DEP_COLS = () => narrow ? [["dest", 11, "Destination"], ["tok", 6, "Tokens"]]
+  : [["time", 6, "Last"], ["dest", 11, "Destination"], ["plat", 2, "Pl"], ["tok", 6, "Tokens"], ["share", 5, "Share"], ["st", 8, "Status"]];
+const TT_COLS = () => [["date", 6, "Date"], ["tok", 6, "Tokens"], ["top", 7, "Top"], ["fl", 1, ""]];
+const NDEP = 10, NTT = 8;
+function build() {
+  const nw = innerWidth < 900;
+  if (nw === narrow) { resize(); return; }
+  narrow = nw; cells.length = 0;
+  for (const id of ["rTotal", "rToday", "rMeas", "rEst", "depHdr", "depRows", "ttHdr", "ttRows"]) $(id).innerHTML = "";
+  F.total = field($("rTotal"), 14, "yel"); F.today = field($("rToday"), 14);
+  F.meas = field($("rMeas"), 6); F.est = field($("rEst"), 6);
+  F.dep = []; const dc = DEP_COLS();
+  $("depHdr").innerHTML = '<span style="width:12px"></span>';
+  for (let r = 0; r < NDEP; r++) {
+    const row = document.createElement("div"); row.className = "row"; row.dataset.pad = 12;
+    const liv = document.createElement("div"); liv.className = "liv"; row.appendChild(liv);
+    const o = { row, liv };
+    dc.forEach(([k, n], i) => { if (i) gap(row); o[k] = field(row, n); });
+    $("depRows").appendChild(row); F.dep.push(o);
+  }
+  F.tt = []; const tc = TT_COLS();
+  for (let r = 0; r < NTT; r++) {
+    const row = document.createElement("div"); row.className = "row"; const o = { row };
+    tc.forEach(([k, n], i) => { if (i) gap(row); o[k] = field(row, n); });
+    $("ttRows").appendChild(row); F.tt.push(o);
+  }
+  resize();
+  if (D) render(D, true);
+}
+function hdr(el, cols, w, lead) {
+  el.innerHTML = (lead ? `<span style="width:${lead}px"></span>` : "") + cols.map(([k, n, name], i) =>
+    `<span style="width:${n * (w + 2) + (i ? w * .55 : 0)}px;padding-left:${i ? w * .55 : 0}px">${name}</span>`).join("");
+}
+function resize() {
+  const tw = sizeRow($("rTotal"), 14, 46, 0, $("rTotal").parentElement); sizeRow($("rToday"), 14, Math.round(tw * .72), 0, $("rToday").parentElement);
+  for (const id of ["rMeas", "rEst"]) { const r = $(id); r.style.setProperty("--w", "16px"); r.style.setProperty("--h", "23px"); }
+  const dc = DEP_COLS(), dn = dc.reduce((a, c) => a + c[1], 0);
+  const w = sizeRow(F.dep[0].row, dn, 20, dc.length - 1 + 0.6, $("depRows").parentElement);
+  F.dep.forEach(o => { o.row.style.setProperty("--w", w + "px"); o.row.style.setProperty("--h", Math.round(w * 1.42) + "px"); });
+  hdr($("depHdr"), dc, w, 12);
+  const tc = TT_COLS(), tn = tc.reduce((a, c) => a + c[1], 0);
+  const w2 = sizeRow(F.tt[0].row, tn, 18, tc.length - 1, $("ttRows").parentElement);
+  F.tt.forEach(o => { o.row.style.setProperty("--w", w2 + "px"); o.row.style.setProperty("--h", Math.round(w2 * 1.42) + "px"); });
+  hdr($("ttHdr"), tc, w2, 0);
+  const h = $("hist"), r = h.getBoundingClientRect(); h.width = Math.max(10, r.width * devicePixelRatio); h.height = Math.max(10, r.height * devicePixelRatio);
+  drawHist(); bgResize(); tickW = $("tick").clientWidth;
+}
+
+// ---------- data -> board ----------
+const MON = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const dlabel = iso => iso.slice(8) + " " + MON[+iso.slice(5, 7) - 1];
+const daysBetween = (a, b) => Math.round((new Date(b + "T00:00") - new Date(a + "T00:00")) / 864e5);
+let page = 0, pages = 1, lastPageFlip = 0, milestones = [];
+function render(d, force) {
+  const first = !D; D = d;
+  if (force) F.total._s = null;
+  fromTotal = first ? 0 : shownTotal; toTotal = d.total; tStart = performance.now();
+  F.today.write(TB.full(d.today), true, 300);
+  F.meas.write(TB.fmt(d.measured), true, 500); F.est.write(TB.fmt(d.estimated), true, 600);
+  const bar = $("mbar").children, tot = d.measured + d.estimated || 1;
+  bar[0].style.width = (d.measured / tot * 100) + "%"; bar[1].style.width = (d.estimated / tot * 100) + "%";
+  $("todayPct").textContent = "intensity " + Math.round(d.intensity * 100) + "%";
+  $("wk").textContent = "week " + TB.fmt(d.week);
+  $("demo").textContent = d.demo ? "SAMPLE DATA" : "live · " + d.firstDay + " → " + d.todayISO;
+  // last-used day per model
+  const last = {};
+  for (const x of d.days) for (const k in x.byModel) last[k] = x.d;
+  F.dep.forEach((o, i) => {
+    const m = d.models[i], dl = 400 + i * 140;
+    if (!m) { for (const k in o) if (o[k] && o[k].write) o[k].write(""); o.liv.style.background = "transparent"; return; }
+    const ago = daysBetween(last[m.name] || d.firstDay, d.todayISO);
+    const st = ago === 0 ? "BOARDING" : ago <= 3 ? "ON TIME" : ago <= 14 ? "DELAYED" : "DEPARTED";
+    o.liv.style.background = m.color; o.liv.style.boxShadow = "0 0 8px " + m.color;
+    if (o.time) o.time.write(dlabel(last[m.name] || d.firstDay), false, dl);
+    o.dest.write(m.name, false, dl + 60);
+    if (o.plat) o.plat.write(String(i + 1), true, dl + 90);
+    o.tok.write(TB.fmt(m.tokens), true, dl + 120);
+    if (o.share) o.share.write((m.share * 100).toFixed(m.share < .001 ? 2 : m.share < .1 ? 1 : 0) + "%", true, dl + 140);
+    o.liv.classList.toggle("boarding", st === "BOARDING"); o.liv.title = st;
+    if (o.st) o.st.write(st, false, dl + 160); if (o.st) o.st.color(st === "BOARDING" ? "grn" : st === "DELAYED" ? "yel" : st === "DEPARTED" ? "red" : "");
+  });
+  pages = Math.max(1, Math.ceil(d.days.length / NTT));
+  page = Math.min(page, pages - 1); writePage(900);
+  // milestones: dates the running total crossed each billion
+  let cum = 0, nextB = 1e9; milestones = [];
+  for (const x of d.days) { cum += x.tokens; while (cum >= nextB) { milestones.push([nextB, x.d]); nextB += 1e9; } }
+  const nb = Math.ceil((d.total + 1) / 1e9) * 1e9;
+  const top = d.models[0];
+  $("nextB").textContent = TB.full(nb); $("nleft").textContent = TB.fmt(nb - d.total) + " to go";
+  $("nbar").style.width = ((1 - (nb - d.total) / 1e9) * 100).toFixed(1) + "%";
+  setTicker([
+    d.demo ? "*** SAMPLE DATA - SERVER NOT REACHABLE ***" : "*** TOKEN BURN CENTRAL ***",
+    `TODAY ${TB.full(d.today)} TOKENS ON ${Object.keys((d.days.find(x => x.d === d.todayISO) || { byModel: {} }).byModel).length || 0} SERVICES`,
+    top ? `BUSIEST LINE: ${top.name.toUpperCase()} ${TB.fmt(top.tokens)} (${(top.share * 100).toFixed(1)}%)` : "",
+    `NEXT MILESTONE ${TB.full(nb)} - ${TB.full(nb - d.total)} TO GO`,
+    milestones.length ? "MILESTONES: " + milestones.slice(-4).map(([b, dd]) => TB.fmt(b) + " ON " + dlabel(dd)).join(" · ") : "",
+    `BIGGEST DAY ${TB.fmt(d.maxDay)} · ${d.days.length} DAYS OF SERVICE SINCE ${dlabel(d.firstDay)}`,
+    `ESTIMATED ${TB.fmt(d.estimated)} · MEASURED ${TB.fmt(d.measured)}`
+  ].filter(Boolean).join("     ◆     "));
+  drawHist();
+  if (!first && Math.floor(d.total / 1e9) > Math.floor(fromTotal / 1e9)) celebrate(Math.floor(d.total / 1e9) * 1e9);
+}
+function writePage(delay = 0) {
+  if (!D) return;
+  const rev = D.days.slice().reverse(), rows = rev.slice(page * NTT, page * NTT + NTT);
+  $("page").textContent = "page " + (page + 1) + "/" + pages + " · newest first";
+  F.tt.forEach((o, i) => {
+    const x = rows[i], dl = delay + i * 90;
+    if (!x) { o.date.write("", 0, dl); o.tok.write("", 0, dl); o.top.write("", 0, dl); o.fl.write("", 0, dl); return; }
+    const topM = Object.entries(x.byModel).sort((a, b) => b[1] - a[1])[0];
+    o.date.write(dlabel(x.d), false, dl); o.tok.write(TB.fmt(x.tokens), true, dl + 40);
+    o.top.write(topM ? topM[0].replace(" local", "L") : "", false, dl + 80);
+    const est = x.est > x.tokens / 2; o.fl.write(x.d === D.todayISO ? "/" : est ? "E" : "M", false, dl + 100);
+    o.fl.color(x.d === D.todayISO ? "grn" : est ? "" : "yel");
+    o.tok.color(x.tokens === D.maxDay ? "yel" : "");
+  });
+  drawHist();
+}
+function celebrate(b) {
+  setTicker(`*** ANNOUNCEMENT *** THE ${TB.full(b)} TOKEN SERVICE HAS NOW ARRIVED *** ANNOUNCEMENT ***`);
+  const keep = cells.map(c => c.target);
+  cells.forEach((c, i) => setCell(c, CH[1 + (i * 7) % 36], (i % 40) * 15));
+  setTimeout(() => cells.forEach((c, i) => setCell(c, keep[i], (i % 40) * 15)), 2600);
+}
+
+// ---------- history poster ----------
+let histBars = [];
+function drawHist() {
+  const cv = $("hist"), g = cv.getContext("2d"), W = cv.width, H = cv.height, dpr = devicePixelRatio;
+  g.clearRect(0, 0, W, H); if (!D) return;
+  const days = D.days, n = days.length; if (!n) return;
+  // continuous calendar from first day to today
+  const span = daysBetween(D.firstDay, D.todayISO) + 1, map = {}; days.forEach(x => map[x.d] = x);
+  const pl = 6 * dpr, pr = 6 * dpr, pt = 8 * dpr, pb = 16 * dpr, bw = (W - pl - pr) / span;
+  g.strokeStyle = "rgba(60,45,20,.18)"; g.lineWidth = 1;
+  for (let k = 1; k < 4; k++) { const y = pt + (H - pt - pb) * k / 4; g.beginPath(); g.moveTo(pl, y); g.lineTo(W - pr, y); g.stroke(); }
+  const shown = new Set(D.days.slice().reverse().slice(page * NTT, page * NTT + NTT).map(x => x.d));
+  histBars = [];
+  const t0 = new Date(D.firstDay + "T00:00");
+  g.font = `${9 * dpr}px DejaVu Sans Mono, monospace`; g.fillStyle = "#6a5a3d"; g.textAlign = "left";
+  for (let i = 0; i < span; i++) {
+    const dt = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + i), iso = TB.iso(dt), x = map[iso], X = pl + i * bw;
+    if (dt.getDate() === 1 || i === 0) { g.fillStyle = "#6a5a3d"; g.fillText(MON[dt.getMonth()], X, H - 4 * dpr); g.fillRect(X, H - pb, 1, 4 * dpr); }
+    if (!x) continue;
+    const hh = Math.max(2 * dpr, Math.sqrt(x.tokens / D.maxDay) * (H - pt - pb)), y0 = H - pb;
+    const meas = x.tokens - x.est, hm = hh * meas / x.tokens;
+    // stacked by model for measured part, hatched for estimated
+    let y = y0;
+    const ents = Object.entries(x.byModel).sort((a, b) => b[1] - a[1]);
+    if (x.est > 0) { g.fillStyle = "#8a7d63"; g.fillRect(X, y - (hh - hm), Math.max(1, bw - 1), hh - hm); y -= hh - hm;
+      g.strokeStyle = "rgba(255,255,255,.35)"; g.beginPath(); for (let s = y; s < y0; s += 3 * dpr) { g.moveTo(X, s); g.lineTo(X + bw - 1, s - 2 * dpr); } g.stroke(); }
+    for (const [k, v] of ents) { const part = v / x.tokens * hm; if (part <= 0) continue; g.fillStyle = TB.color(k); g.fillRect(X, y - part, Math.max(1, bw - 1), part); y -= part; }
+    if (shown.has(iso)) { g.fillStyle = "rgba(30,20,10,.12)"; g.fillRect(X - 0.5, pt, bw, y0 - pt); }
+    if (iso === D.todayISO) { g.fillStyle = "#2a241b"; g.beginPath(); g.moveTo(X + bw / 2, y0 - hh - 2 * dpr); g.lineTo(X + bw / 2 - 4 * dpr, y0 - hh - 8 * dpr); g.lineTo(X + bw / 2 + 4 * dpr, y0 - hh - 8 * dpr); g.fill(); }
+    histBars.push({ X: X / dpr, w: bw / dpr, x });
+  }
+  $("hspan").innerHTML = "<b>" + TB.fmt(D.maxDay) + "</b> peak · grey = estimated";
+}
+$("hist").addEventListener("mousemove", e => {
+  const r = e.target.getBoundingClientRect(), mx = e.clientX - r.left, b = histBars.find(b => mx >= b.X && mx < b.X + Math.max(b.w, 2));
+  const tip = $("tip"); if (!b) { tip.style.display = "none"; return; }
+  const ents = Object.entries(b.x.byModel).sort((a, c) => c[1] - a[1]).slice(0, 3).map(([k, v]) => k + " " + TB.fmt(v)).join(", ");
+  tip.textContent = b.x.d + "  " + TB.full(b.x.tokens) + (b.x.est ? "  (est " + TB.fmt(b.x.est) + ")" : "") + "  " + ents;
+  tip.style.display = "block"; tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 12) + "px"; tip.style.top = (e.clientY - 34) + "px";
+});
+$("hist").addEventListener("mouseleave", () => $("tip").style.display = "none");
+
+// ---------- ticker ----------
+let tickX = 0, msgW = 0, tickW = 1300;
+function setTicker(s) { const m = $("msg"); m.textContent = s + "     ◆     "; msgW = m.offsetWidth; tickW = $("tick").clientWidth; tickX = tickW; }
+
+// ---------- sound ----------
+let ac = null, noise = null, sound = false;
+$("snd").onclick = () => {
+  sound = !sound; $("snd").setAttribute("aria-pressed", sound);
+  if (sound && !ac) {
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    noise = ac.createBuffer(1, ac.sampleRate * .02, ac.sampleRate);
+    const ch = noise.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / ch.length, 4);
+  }
+};
+function clack(n) {
+  if (!sound || !ac || !n) return;
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = noise; s.playbackRate.value = .7 + Math.random() * .6; f.type = "bandpass"; f.frequency.value = 2200 + Math.random() * 1500; f.Q.value = 1.2;
+  g.gain.value = Math.min(.5, .05 + n * .012); s.connect(f); f.connect(g); g.connect(ac.destination); s.start();
+}
+
+// ---------- clock ----------
+function drawClock(now) {
+  const cv = $("clock"), g = cv.getContext("2d"), W = cv.width, R = W / 2;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, W); g.translate(R, R);
+  // brass bezel
+  let gr = g.createLinearGradient(-R, -R, R, R); gr.addColorStop(0, "#f2d98d"); gr.addColorStop(.5, "#9b7428"); gr.addColorStop(1, "#e9c871");
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 0, R - 2, 0, 7); g.fill();
+  g.fillStyle = "#1b1209"; g.beginPath(); g.arc(0, 0, R * .9, 0, 7); g.fill();
+  gr = g.createRadialGradient(-R * .2, -R * .3, 10, 0, 0, R * .88); gr.addColorStop(0, "#fffdf4"); gr.addColorStop(1, "#e8dfc6");
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 0, R * .87, 0, 7); g.fill();
+  for (let i = 0; i < 60; i++) {
+    const a = i / 60 * Math.PI * 2, big = i % 5 === 0;
+    g.save(); g.rotate(a); g.fillStyle = "#1a1a1a"; g.fillRect(-(big ? 5 : 1.6), -R * .84, big ? 10 : 3.2, big ? R * .2 : R * .06); g.restore();
+  }
+  g.fillStyle = "#6a5a3d"; g.font = "bold 16px DejaVu Sans"; g.textAlign = "center"; g.fillText("TOKEN BURN", 0, R * .35);
+  const t = new Date(now), s = t.getSeconds() + t.getMilliseconds() / 1000, m = t.getMinutes() + s / 60, h = (t.getHours() % 12) + m / 60;
+  const hand = (a, len, w, col, tail) => { g.save(); g.rotate(a); g.fillStyle = col; g.beginPath(); g.moveTo(-w / 2, tail); g.lineTo(-w * .38, -len); g.lineTo(w * .38, -len); g.lineTo(w / 2, tail); g.fill(); g.restore(); };
+  g.shadowColor = "rgba(0,0,0,.3)"; g.shadowBlur = 6; g.shadowOffsetY = 3;
+  hand(h / 12 * Math.PI * 2, R * .5, 14, "#141414", R * .12);
+  hand(m / 60 * Math.PI * 2, R * .76, 10, "#141414", R * .14);
+  g.save(); g.rotate(s / 60 * Math.PI * 2); g.fillStyle = "#c8401e"; g.fillRect(-2, -R * .8, 4, R * .98); g.beginPath(); g.moveTo(0, -R * .8); g.lineTo(-6, -R * .66); g.lineTo(6, -R * .66); g.fill(); g.restore();
+  g.shadowBlur = 0; g.shadowOffsetY = 0; g.fillStyle = "#c8401e"; g.beginPath(); g.arc(0, 0, 8, 0, 7); g.fill();
+  // glass glint
+  g.fillStyle = "rgba(255,255,255,.18)"; g.beginPath(); g.ellipse(-R * .3, -R * .4, R * .45, R * .2, -.6, 0, 7); g.fill();
+}
+
+// ---------- background: brick vault, lamps, dust ----------
+const bg = $("bg"), bgc = bg.getContext("2d"); let wallImg = null, motes = [];
+function bgResize() {
+  const dpr = Math.min(devicePixelRatio, 1.5); bg.width = innerWidth * dpr; bg.height = innerHeight * dpr;
+  const W = bg.width, H = bg.height, o = document.createElement("canvas"); o.width = W; o.height = H; const g = o.getContext("2d");
+  g.fillStyle = "#1e130c"; g.fillRect(0, 0, W, H);
+  const bh = 18 * dpr, bw = 46 * dpr; let seed = 3; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  for (let y = 0, r = 0; y < H; y += bh, r++) for (let x = -(r % 2) * bw / 2; x < W; x += bw) {
+    const l = 16 + rnd() * 10; g.fillStyle = `hsl(${12 + rnd() * 10},${35 + rnd() * 15}%,${l}%)`; g.fillRect(x + dpr, y + dpr, bw - 2 * dpr, bh - 2 * dpr);
+  }
+  // iron arches
+  g.strokeStyle = "#0d0a08"; g.lineWidth = 14 * dpr;
+  const n = Math.max(2, Math.round(W / (520 * dpr)));
+  for (let i = 0; i < n; i++) { const cx = (i + .5) * W / n, rw = W / n * .5; g.beginPath(); g.ellipse(cx, H * .55, rw, H * .62, 0, Math.PI, 0); g.stroke(); }
+  const v = g.createLinearGradient(0, 0, 0, H); v.addColorStop(0, "rgba(0,0,0,.65)"); v.addColorStop(.4, "rgba(0,0,0,.25)"); v.addColorStop(1, "rgba(0,0,0,.8)");
+  g.fillStyle = v; g.fillRect(0, 0, W, H);
+  g.globalCompositeOperation = "lighter";
+  for (let i = 0; i <= n; i++) { const lx = i / n * W, gr = g.createRadialGradient(lx, H * .06, 0, lx, H * .06, H * .8); gr.addColorStop(0, "rgba(255,170,80,.3)"); gr.addColorStop(.35, "rgba(255,130,50,.1)"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.fillRect(0, 0, W, H); }
+  bgc.drawImage(o, 0, 0); wallImg = o;
+}
+const dust = $("dust"), dg = dust.getContext("2d");
+function drawBg(t) {
+  const dpr = Math.min(devicePixelRatio, 1.5), W = Math.round(innerWidth * dpr), H = Math.round(innerHeight * dpr), I = D ? D.intensity : .3;
+  if (dust.width !== W || dust.height !== H) { dust.width = W; dust.height = H; }
+  dg.clearRect(0, 0, W, H);
+  const want = Math.round(25 + I * 75);
+  while (motes.length < want) motes.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random(), p: Math.random() * 6 });
+  motes.length = Math.min(motes.length, want);
+  dg.fillStyle = "#ffc88c";
+  for (const m of motes) {
+    m.y -= (.08 + m.s * .25) * (1 + I * 2) * dpr; m.x += Math.sin(t * .0007 + m.p) * .25 * dpr;
+    if (m.y < -5) { m.y = H + 5; m.x = Math.random() * W; }
+    dg.globalAlpha = .15 + .4 * m.s; dg.fillRect(m.x, m.y, (1 + m.s * 1.6) * dpr, (1 + m.s * 1.6) * dpr);
+  }
+  dg.globalAlpha = 1;
+}
+
+// ---------- loop ----------
+let lastTot = 0;
+function frame() {
+  requestAnimationFrame(frame); const now = performance.now();
+  if (document.hidden) return;
+  // total ticks toward the new value
+  if (D) {
+    const k = fromTotal ? Math.min(1, (now - tStart) / 20000) : 1, e = 1 - Math.pow(1 - k, 3);
+    shownTotal = fromTotal + (toTotal - fromTotal) * e;
+    if (now - lastTot > 450 || k >= 1) {
+      const s = TB.full(shownTotal);
+      if (s !== F.total._s) { F.total._s = s; F.total.write(s, true); lastTot = now; }
+    }
+    if (now - lastPageFlip > 9000 && pages > 1) { lastPageFlip = now; page = (page + 1) % pages; writePage(0); }
+  }
+  // step flaps
+  let n = 0; const speed = STEP * (1.15 - (D ? D.intensity : .5) * .3);
+  for (const c of cells) if (c.cur !== c.target && now >= c.next) { step(c, now); c.next = now + speed; n++; }
+  animate(now);
+  if (n) clack(n);
+  drawBg(now);
+  if (!drawClock.t || now - drawClock.t > 120) { drawClock.t = now; drawClock(Date.now()); }
+  const t = new Date(), ts = String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0") + ":" + String(t.getSeconds()).padStart(2, "0");
+  if (ts !== frame.ts) { frame.ts = ts; $("dclock").textContent = ts; }
+  tickX -= 1.1 + (D ? D.intensity : 0) * .8; if (tickX < -msgW) tickX = tickW;
+  $("msg").style.transform = `translateX(${tickX}px)`;
+}
+addEventListener("resize", () => { clearTimeout(build.t); build.t = setTimeout(build, 120); });
+build();
+TB.onData(d => render(d));
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

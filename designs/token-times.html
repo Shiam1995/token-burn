@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Token Times</title>
+<meta name="description" content="A broadsheet front page written from the data: today's burn as the headline, the running total as a giant front-page figure, an article per model, a printed history chart and classified-ad legend on newsprint.">
+<style>
+:root{
+  --paper:#f2ecdf; --paper2:#e9e1cf; --ink:#1b1a17; --ink2:#3d3a33; --ink3:#6b665a; --rule:#2a2823; --red:#a3271d;
+  --serif:"Times New Roman","Liberation Serif","Nimbus Roman","DejaVu Serif",Times,Georgia,serif;
+  --head:"Playfair Display","Bodoni 72","Didot","Liberation Serif","Times New Roman",Georgia,serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:#cfc6b2;color:var(--ink);font-family:var(--serif);overflow-x:hidden}
+.sheet{max-width:1240px;margin:18px auto;background:var(--paper);position:relative;padding:22px 30px 26px;box-shadow:0 2px 0 #b9ae95,0 18px 40px rgba(40,30,10,.25)}
+.sheet::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.55;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .4  0 0 0 0 .3  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+  radial-gradient(ellipse at 50% 40%,transparent 55%,rgba(120,95,50,.16) 100%)}
+.sheet>*{position:relative}
+.ink{opacity:0;transform:translateY(4px);transition:opacity .9s ease,transform .9s ease}
+.ink.on{opacity:1;transform:none}
+.topline{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase;border-bottom:1px solid var(--rule);padding-bottom:5px;flex-wrap:wrap}
+.mast{display:grid;grid-template-columns:170px 1fr 170px;align-items:center;gap:16px;padding:10px 0 6px}
+.ear{border:1px solid var(--rule);padding:7px 9px;font-size:12px;line-height:1.3;text-align:center}
+.ear b{display:block;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:3px}
+.ear .big{font-family:var(--head);font-size:21px;font-weight:700;display:block;margin:2px 0}
+h1.title{margin:0;text-align:center;font-family:var(--head);font-weight:900;font-size:clamp(40px,7.6vw,92px);letter-spacing:-.01em;line-height:.95;font-style:normal}
+h1.title .the{font-size:.45em;font-style:italic;font-weight:400;vertical-align:.55em;margin-right:.12em}
+.motto{text-align:center;font-style:italic;font-size:13px;color:var(--ink2);margin-top:4px}
+.dateline{display:flex;justify-content:space-between;gap:10px;border-top:3px double var(--rule);border-bottom:1px solid var(--rule);padding:5px 0;font-size:13px;margin:6px 0 14px;flex-wrap:wrap}
+.dateline span:nth-child(2){font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.headline{font-family:var(--head);font-weight:900;font-size:clamp(30px,4.6vw,60px);line-height:1.0;text-align:center;margin:0 0 8px;letter-spacing:-.01em;text-transform:uppercase}
+.deck{text-align:center;font-style:italic;font-size:clamp(16px,1.7vw,21px);color:var(--ink2);margin:0 auto 14px;max-width:900px;line-height:1.3}
+.front{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.front>div{padding:14px 18px}
+.front>div+div{border-left:1px solid var(--rule)}
+.figlabel{font-size:12px;letter-spacing:.18em;text-transform:uppercase;text-align:center;color:var(--ink2)}
+.figure{font-family:var(--head);font-weight:900;text-align:center;font-size:clamp(34px,5.4vw,74px);letter-spacing:-.025em;line-height:1.02;font-variant-numeric:tabular-nums lining-nums;margin:6px 0 4px;white-space:nowrap}
+.figure small{font-size:.32em;letter-spacing:.06em;font-weight:700}
+.figsub{text-align:center;font-size:14px;font-style:italic;color:var(--ink2);border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:10px}
+.statrow{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:12px}
+.statrow div+div{border-left:1px solid #9c9584}
+.statrow b{display:block;font-family:var(--head);font-size:23px;font-variant-numeric:tabular-nums lining-nums}
+.statrow span{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink3)}
+.lead{column-count:2;column-gap:22px;column-rule:1px solid #b3ab98;font-size:15.5px;line-height:1.42;text-align:justify;hyphens:auto}
+.lead p{margin:0 0 .7em}
+.lead p:first-child::first-letter{float:left;font-family:var(--head);font-weight:900;font-size:3.6em;line-height:.82;padding:4px 6px 0 0}
+.byline{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin:0 0 8px}
+.kicker{font-size:11.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--red)}
+.chartcap{font-size:13px;font-style:italic;color:var(--ink2);margin-top:6px;line-height:1.35}
+.chartcap b{font-style:normal}
+#hist{display:block;width:100%;height:270px}
+.h2{font-family:var(--head);font-weight:800;font-size:23px;line-height:1.05;margin:4px 0 6px}
+.section{display:flex;align-items:center;gap:12px;margin:18px 0 10px;font-size:13px;font-weight:700;letter-spacing:.3em;text-transform:uppercase}
+.section::before,.section::after{content:"";flex:1;border-top:3px double var(--rule)}
+.cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--rule)}
+.art{padding:12px 14px 14px;border-bottom:1px solid var(--rule);font-size:14.5px;line-height:1.4;text-align:justify;hyphens:auto}
+.art:not(:nth-child(4n+1)){border-left:1px solid var(--rule)}
+.art p{margin:0 0 .55em}
+.art .h2,.art .kicker{text-align:left}
+.art .spot{display:block;height:5px;margin:0 0 8px;background:var(--c);mix-blend-mode:multiply;opacity:.85}
+.art .fig{font-family:var(--head);font-weight:900;font-size:28px;font-variant-numeric:tabular-nums lining-nums;margin:2px 0 4px;letter-spacing:-.01em}
+.art .mini{display:block;width:100%;height:34px;margin:6px 0 4px}
+.lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:0;border-top:1px solid var(--rule);margin-top:0}
+.lower>div{padding:12px 16px}
+.lower>div+div{border-left:1px solid var(--rule)}
+.audit{font-size:14.5px;line-height:1.4;text-align:justify}
+.audit .bar{height:22px;border:1px solid var(--rule);display:flex;margin:10px 0 6px}
+.audit .bar i{display:block;height:100%}
+.audit .lg{display:flex;justify-content:space-between;font-size:12.5px}
+.classi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ad{border:1px solid var(--rule);padding:7px 8px;font-size:12.5px;line-height:1.28;text-align:left;position:relative}
+.ad b{font-family:var(--head);font-size:14px;display:block;letter-spacing:.04em;text-transform:uppercase}
+.ad .sq{display:inline-block;width:12px;height:12px;border:1px solid var(--rule);margin-right:6px;vertical-align:-1px;mix-blend-mode:multiply}
+.ad .t{font-variant-numeric:tabular-nums lining-nums;font-weight:700}
+.ad:nth-child(3n+2){border-style:double;border-width:3px}
+.stamp{position:absolute;top:110px;right:40px;border:4px solid var(--red);color:var(--red);font-family:var(--head);font-weight:900;font-size:26px;padding:4px 14px;transform:rotate(-9deg) scale(2);opacity:0;letter-spacing:.06em;text-transform:uppercase;transition:transform .5s cubic-bezier(.2,1.6,.4,1),opacity .4s;mix-blend-mode:multiply;pointer-events:none;text-align:center;line-height:1}
+.stamp small{display:block;font-size:11px;letter-spacing:.2em;font-weight:700;margin-top:2px}
+.stamp.on{opacity:.82;transform:rotate(-9deg) scale(1)}
+.ticker{margin-top:16px;border-top:3px double var(--rule);border-bottom:1px solid var(--rule);overflow:hidden;white-space:nowrap;font-size:13.5px;padding:5px 0;display:flex;gap:0}
+.ticker .lbl{flex:0 0 auto;background:var(--ink);color:var(--paper);font-weight:700;letter-spacing:.14em;padding:1px 10px;margin-right:10px;text-transform:uppercase;font-size:12px;align-self:center;z-index:1}
+.ticker .run{display:inline-block;animation:tick var(--tdur,60s) linear infinite;padding-left:20px}
+.ticker .run span{margin-right:40px}
+@keyframes tick{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.colophon{font-size:11.5px;text-align:center;color:var(--ink3);margin-top:10px;font-style:italic}
+@media (max-width:1050px){.cols{grid-template-columns:repeat(2,minmax(0,1fr))}.art:not(:nth-child(4n+1)){border-left:0}.art:nth-child(2n){border-left:1px solid var(--rule)}.classi{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:820px){.front,.lower{grid-template-columns:1fr}.front>div+div,.lower>div+div{border-left:0;border-top:1px solid var(--rule)}.mast{grid-template-columns:1fr}.ear{display:none}}
+@media (max-width:560px){
+  body{background:var(--paper)}
+  .sheet{margin:0;padding:12px 16px 20px;box-shadow:none}
+  .front>div,.lower>div{padding:12px 0}
+  .lead{column-count:1}.cols{grid-template-columns:1fr}.art{padding:12px 0}.art:nth-child(2n){border-left:0}
+  .classi{grid-template-columns:1fr 1fr}.statrow b{font-size:18px}
+  .figure{font-size:clamp(30px,10vw,44px)}
+  .topline span:nth-child(2){display:none}
+  .stamp{top:70px;right:10px;font-size:17px}
+  #hist{height:200px}
+}
+</style>
+</head>
+<body>
+<div class="sheet" id="sheet">
+  <div class="topline ink"><span id="vol">Vol. I · No. 1</span><span>Late City Edition</span><span id="price">Price: one token</span></div>
+  <div class="mast ink">
+    <div class="ear" id="earL"><b>Burn Forecast</b><span class="big" id="wxBig">—</span><span id="wxTxt"></span></div>
+    <div><h1 class="title"><span class="the">The</span>Token Times</h1><div class="motto">Every token counted, every day recorded</div></div>
+    <div class="ear" id="earR"><b>Market Leader</b><span class="big" id="mkBig">—</span><span id="mkTxt"></span></div>
+  </div>
+  <div class="dateline ink"><span id="dlLeft"></span><span id="dlMid"></span><span id="dlRight"></span></div>
+  <div class="stamp" id="stamp">Extra!<small id="stampTxt"></small></div>
+
+  <h2 class="headline ink" id="headline">Tokens burn</h2>
+  <p class="deck ink" id="deck"></p>
+
+  <div class="front ink">
+    <div>
+      <div class="figlabel" id="figLabel">Tokens burned to date</div>
+      <div class="figure" id="figure">0</div>
+      <div class="figsub" id="figsub"></div>
+      <div class="statrow"><div><b id="sToday">0</b><span>Today</span></div><div><b id="sWeek">0</b><span>This week</span></div><div><b id="sSince">0</b><span>Since 17 Nov</span></div></div>
+      <div class="lead" id="lead"></div>
+    </div>
+    <div>
+      <div class="kicker">The Record</div>
+      <div class="h2" id="histHead">A history of the burn, day by day</div>
+      <div class="byline">Compiled by the statistics desk</div>
+      <svg id="hist" role="img" aria-label="Bar chart of tokens per day"></svg>
+      <div class="chartcap" id="histCap"></div>
+    </div>
+  </div>
+
+  <div class="section ink">The Models</div>
+  <div class="cols ink" id="cols"></div>
+
+  <div class="lower ink">
+    <div><div class="kicker">The Audit Desk</div><div class="h2" id="auditHead">How much of it was counted?</div><div class="audit" id="audit"></div></div>
+    <div><div class="kicker">Classifieds</div><div class="h2">Inks of the trade &mdash; a key to the colours</div><div class="classi" id="classi"></div></div>
+  </div>
+
+  <div class="ticker"><span class="lbl">Stop press</span><div style="overflow:hidden;flex:1"><div class="run" id="run"></div></div></div>
+  <div class="colophon" id="colo"></div>
+</div>
+<script src="tb-data.js"></script>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const MON=["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAY=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const pd=s=>new Date(s+"T12:00:00");
+const dmy=s=>{const t=pd(s);return t.getDate()+" "+MON[t.getMonth()]};
+const dsh=s=>{const t=pd(s);return t.getDate()+" "+MON[t.getMonth()].slice(0,3)};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const NUMW=["no","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve"];
+const nw=n=>n<=12?NUMW[n]:String(n);
+const ORD=["first","second","third","fourth","fifth","sixth","seventh","eighth","ninth","tenth","eleventh","twelfth"];
+function words(n){if(n>=1e9)return(n/1e9).toFixed(n>=1e10?1:2).replace(/\.?0+$/,"")+" billion";if(n>=1e6)return(n/1e6).toFixed(n>=1e8?0:1).replace(/\.0$/,"")+" million";if(n>=1e3)return Math.round(n/1e3)+" thousand";return String(Math.round(n))}
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+function pct(a,b){return b?(a-b)/b*100:null}
+function fillDays(d){const m={};d.days.forEach(x=>m[x.d]=x);const out=[];let t=pd(d.firstDay);const end=pd(d.todayISO);
+  while(t<=end){const k=TB.iso(t);out.push(m[k]||{d:k,tokens:0,est:0,byModel:{}});t=new Date(t.getTime()+864e5)}return out}
+
+/* ---------- counters ---------- */
+const shown={total:0,today:0,week:0,since:0};let from={...shown},target={...shown},t0=0,raf=0;const DUR=2200;
+function paint(){$("figure").textContent=TB.full(shown.total);$("sToday").textContent=TB.fmt(shown.today);$("sWeek").textContent=TB.fmt(shown.week);$("sSince").textContent=TB.fmt(shown.since)}
+function tick(){const k=Math.max(0,Math.min(1,(performance.now()-t0)/DUR)),e=1-Math.pow(1-k,4);for(const q in target)shown[q]=from[q]+(target[q]-from[q])*e;paint();if(k<1&&!document.hidden)raf=requestAnimationFrame(tick);else raf=0}
+function setT(t){from={...shown};target=t;t0=performance.now();if(!raf)raf=requestAnimationFrame(tick);setTimeout(()=>{if(performance.now()-t0>=DUR){Object.assign(shown,target);paint()}},DUR+60)}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!raf)raf=requestAnimationFrame(tick)});
+
+function stamp(big,small){const s=$("stamp");s.firstChild.textContent=big;$("stampTxt").textContent=small;s.classList.remove("on");void s.offsetWidth;setTimeout(()=>s.classList.add("on"),900)}
+
+function modelStats(D,seq,m){
+  let best={d:null,t:0},first=null,days=0;const n=seq.length;
+  seq.forEach(x=>{const v=x.byModel[m.name]||0;if(v>0){days++;if(!first)first=x.d;if(v>best.t)best={d:x.d,t:v}}});
+  const sumR=(a,b)=>seq.slice(a,b).reduce((s,x)=>s+(x.byModel[m.name]||0),0);
+  return{best,first,days,today:seq[n-1].byModel[m.name]||0,w:sumR(-7),pw:sumR(-14,-7),last30:seq.slice(-30).map(x=>x.byModel[m.name]||0)}
+}
+
+function article(D,seq,m,i){
+  const s=modelStats(D,seq,m);const share=(m.share*100);
+  const rank=ORD[i]||(i+1)+"th";
+  let head;
+  if(i===0)head=cap(m.name)+" remains the paper’s great consumer";
+  else if(s.pw===0&&s.w>0)head=cap(m.name)+" bursts onto the scene";
+  else if(s.w>s.pw*1.5&&s.w>0)head=cap(m.name)+" surges in the week’s trading";
+  else if(s.w<s.pw*.5)head=cap(m.name)+" cools after a busy spell";
+  else head=cap(m.name)+" holds "+rank+" place";
+  const p=[];
+  p.push("<b>"+esc(m.name).toUpperCase()+".</b> — "+cap(words(m.tokens))+" tokens have passed through "+esc(m.name)+" since it first appeared on "+dmy(s.first)+", "+(share>=1?share.toFixed(1):share.toFixed(2))+" per cent of everything burned and "+rank+" on the table.");
+  p.push("Its finest hour came on "+DAY[pd(s.best.d).getDay()]+" "+dmy(s.best.d)+", when "+words(s.best.t)+" tokens went up in a single day. It has been at work on "+nw(s.days)+" day"+(s.days===1?"":"s")+" in all.");
+  let wk;const ch=pct(s.w,s.pw);
+  if(s.w===0)wk="It has been silent all week.";
+  else if(ch===null)wk="This week it burned "+words(s.w)+", all of it new business.";
+  else wk="This week it burned "+words(s.w)+", "+(Math.abs(ch)<3?"much as the week before":(ch>0?"up ":"down ")+Math.abs(ch).toFixed(0)+" per cent on the week before")+".";
+  p.push(wk+(s.today>0?" Today’s tally so far: <b>"+TB.full(s.today)+"</b>.":" It has not yet stirred today."));
+  // mini chart
+  const mx=Math.max(1,...s.last30);const W=200,H=34,bw=W/s.last30.length;
+  const bars=s.last30.map((v,j)=>v>0?'<rect x="'+(j*bw+.4).toFixed(1)+'" y="'+(H-1-v/mx*(H-3)).toFixed(1)+'" width="'+(bw-.8).toFixed(1)+'" height="'+(v/mx*(H-3)).toFixed(1)+'" fill="#1b1a17"/>':"").join("");
+  return'<article class="art" style="--c:'+m.color+'"><span class="spot"></span><div class="kicker" style="color:var(--ink3)">'+(i===0?"Lead story":"From our "+esc(m.name)+" correspondent")+'</div><div class="h2">'+esc(head)+'</div><div class="fig">'+TB.fmt(m.tokens)+'</div>'+p.map(x=>"<p>"+x+"</p>").join("")+'<svg class="mini" viewBox="0 0 '+W+" "+H+'" preserveAspectRatio="none"><line x1="0" x2="'+W+'" y1="'+(H-.5)+'" y2="'+(H-.5)+'" stroke="#1b1a17" stroke-width=".6"/>'+bars+'</svg><div class="chartcap" style="font-size:11.5px;margin:0">Last 30 days, '+esc(m.name)+' only.</div></article>';
+}
+
+function drawHist(D,seq){
+  const svg=$("hist");const W=svg.clientWidth||600,H=svg.clientHeight||270;svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  const mL=38,mR=6,mT=14,mB=22,iw=W-mL-mR,ih=H-mT-mB;const mx=D.maxDay;
+  const mag=Math.pow(10,Math.floor(Math.log10(mx/4)));const st=[1,2,2.5,5,10].map(k=>k*mag).find(k=>k>=mx/4);const top=Math.ceil(mx/st)*st;
+  const Y=v=>mT+ih-v/top*ih;const bw=iw/seq.length;
+  let s='<defs><pattern id="hat" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="#f2ecdf"/><line x1="0" y1="0" x2="0" y2="4" stroke="#1b1a17" stroke-width="1.6"/></pattern></defs>';
+  for(let v=0;v<=top+1;v+=st)s+='<line x1="'+mL+'" x2="'+(W-mR)+'" y1="'+Y(v)+'" y2="'+Y(v)+'" stroke="#1b1a17" stroke-width="'+(v?.4:1.2)+'" '+(v?'stroke-dasharray="1 3"':"")+'/><text x="'+(mL-5)+'" y="'+(Y(v)+4)+'" text-anchor="end" font-size="11" font-family="Times New Roman,serif" fill="#3d3a33">'+TB.fmt(v)+"</text>";
+  let lastM=-1;const best=seq.reduce((a,x)=>x.tokens>a.tokens?x:a,seq[0]);
+  seq.forEach((x,i)=>{const xx=mL+i*bw;const t=pd(x.d);
+    if(t.getMonth()!==lastM){lastM=t.getMonth();s+='<line x1="'+xx+'" x2="'+xx+'" y1="'+(mT+ih)+'" y2="'+(mT+ih+5)+'" stroke="#1b1a17"/><text x="'+(xx+2)+'" y="'+(H-5)+'" font-size="11.5" font-style="italic" font-family="Times New Roman,serif" fill="#3d3a33">'+MON[t.getMonth()].slice(0,3)+".</text>"}
+    if(!x.tokens)return;const h=x.tokens/top*ih,he=x.est/top*ih,w=Math.max(1,bw*.72),bx=xx+bw*.14;
+    s+='<rect x="'+bx.toFixed(1)+'" y="'+(mT+ih-h).toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+(h-he).toFixed(1)+'" fill="#1b1a17"><title>'+dmy(x.d)+": "+TB.full(x.tokens)+"</title></rect>";
+    if(he>0)s+='<rect x="'+bx.toFixed(1)+'" y="'+(mT+ih-he).toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+he.toFixed(1)+'" fill="url(#hat)" stroke="#1b1a17" stroke-width=".6"><title>'+dmy(x.d)+": "+TB.full(x.tokens)+" (estimated)</title></rect>";});
+  const bi=seq.indexOf(best),bxx=mL+bi*bw+bw/2,by=Y(best.tokens);
+  const lx=Math.min(W-mR-4,Math.max(mL+4,bxx)),anc=bxx>W*.7?"end":bxx<W*.3?"start":"middle";
+  s+='<text x="'+lx+'" y="'+(by-4)+'" text-anchor="'+anc+'" font-size="11.5" font-style="italic" font-family="Times New Roman,serif" fill="#a3271d">record, '+dsh(best.d)+"</text>";
+  const ti=seq.length-1;s+='<circle cx="'+(mL+ti*bw+bw/2)+'" cy="'+(Y(seq[ti].tokens)-6)+'" r="2.6" fill="#a3271d"/>';
+  svg.innerHTML=s;
+}
+
+let lastTotal=null;
+function render(D){
+  const seq=fillDays(D);const n=seq.length;const now=new Date();const T=pd(D.todayISO);
+  const active=seq.filter(x=>x.tokens>0);const avg=D.total/Math.max(1,active.length);
+  const yest=n>1?seq[n-2].tokens:0;const prevWeek=seq.slice(-14,-7).reduce((a,x)=>a+x.tokens,0);
+  const todayM=Object.entries(seq[n-1].byModel).sort((a,b)=>b[1]-a[1]);
+  const lead=D.models[0]||{name:"Nobody",tokens:0,share:0};
+  const best=seq.reduce((a,x)=>x.tokens>a.tokens?x:a,seq[0]);
+  const wd=DAY[T.getDay()];
+  // mastheads
+  $("vol").textContent="Vol. I · No. "+n;
+  $("dlLeft").textContent=wd+", "+T.getDate()+" "+MON[T.getMonth()]+" "+T.getFullYear();
+  $("dlMid").textContent=D.demo?"Specimen edition — sample figures":"Late edition";
+  $("dlRight").textContent="Printed "+now.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})+" · "+D.models.length+" models reporting";
+  const heat=D.intensity;const r0=D.today/Math.max(1,avg);const wx=r0>2?"Scorching":r0>1.2?"Hot":r0>.7?"Warm":r0>.35?"Mild":"Cool";
+  $("wxBig").textContent=wx;$("wxTxt").textContent="Burn index "+Math.round(heat*100)+" · "+(r0>1.2?"fires well alight":r0>.35?"steady embers":"light embers");
+  $("mkBig").textContent=lead.name;$("mkTxt").textContent=(lead.share*100).toFixed(1)+"% of the market";
+  // headline
+  const ratio=D.today/Math.max(1,avg);const topToday=todayM.length?todayM[0][0]:lead.name;
+  const hour=now.getHours();const sofar=hour<20&&!D.demo?" So Far":"";
+  let H;
+  if(D.today>=best.tokens&&D.today>0)H="Record Burn! "+TB.fmt(D.today)+" Tokens in a Single Day";
+  else if(ratio>1.6)H="Burn Surges to "+TB.fmt(D.today)+" as "+topToday+" Leads the Charge";
+  else if(ratio>.8)H="Steady "+wd+": "+TB.fmt(D.today)+" Tokens Burned"+sofar;
+  else if(D.today>0)H="Quiet "+wd+" — Only "+TB.fmt(D.today)+" Tokens Burned"+sofar;
+  else H="All Quiet: Not a Token Burned Yet This "+wd;
+  $("headline").textContent=H;
+  const wch=pct(D.week,prevWeek);
+  $("deck").innerHTML="Running total passes "+words(Math.floor(D.total/1e8)*1e8)+"; "+words(D.week)+" burned this week"+(wch!==null?", "+(wch>=0?"up ":"down ")+Math.abs(wch).toFixed(0)+" per cent on the week before":"")+"; "+esc(topToday)+" busiest today.";
+  $("figLabel").textContent="Tokens burned since "+dmy(D.firstDay)+" "+pd(D.firstDay).getFullYear();
+  $("figsub").innerHTML="Of which "+words(D.measured)+" counted from the logs and "+words(D.estimated)+" estimated. An average active day burns "+words(avg)+".";
+  // lead article
+  const rivals=D.models.slice(1,4).map(m=>esc(m.name));
+  const yc=pct(D.today,yest);
+  const L=[];
+  L.push("The burn continued "+(ratio>1.2?"apace":ratio>.6?"at a measured pace":"at a gentle simmer")+" this "+wd+", with "+TB.full(D.today)+" tokens consumed by the time this edition went to press"+(yc!==null?" — "+(yc>=0?"ahead of":"behind")+" yesterday’s "+words(yest)+" by "+Math.abs(yc).toFixed(0)+" per cent":"")+".");
+  L.push("Since records began on "+dmy(D.firstDay)+", "+nw(active.length)+" of "+n+" days have seen activity. The single greatest day remains "+DAY[pd(best.d).getDay()]+" "+dmy(best.d)+", when "+words(best.tokens)+" tokens were burned"+(best.est?" (a figure partly estimated)":"")+".");
+  L.push(esc(lead.name)+" continues to dominate, accounting for "+(lead.share*100).toFixed(1)+" per cent of all tokens. "+(rivals.length?"Its nearest rivals, "+rivals.join(", ").replace(/, ([^,]*)$/," and $1")+", trail at a considerable distance.":""));
+  L.push("Since the accounts were opened on 17 November, "+words(D.since)+" tokens have been burned"+(D.paid?" against "+D.cur+D.paid.toFixed(2)+" paid":"")+". Readers will find full figures for each model inside.");
+  $("lead").innerHTML='<div class="byline">By the Token Burn staff</div>'+L.map(x=>"<p>"+x+"</p>").join("");
+  // history
+  drawHist(D,seq);
+  const estDays=seq.filter(x=>x.est>0).length;
+  $("histHead").textContent=n+" days of burning, "+dsh(D.firstDay)+" to "+dsh(D.todayISO);
+  $("histCap").innerHTML="<b>Fig. 1.</b> Tokens burned each day. Solid bars were counted; hatched bars ("+nw(estDays)+" days) were estimated. The red dot marks today; the record stands at "+TB.fmt(best.tokens)+".";
+  // model columns
+  const show=D.models.slice(0,8);
+  $("cols").innerHTML=show.map((m,i)=>article(D,seq,m,i)).join("");
+  // audit
+  const tt=D.measured+D.estimated||1;const mp=D.measured/tt*100;
+  $("auditHead").textContent=mp.toFixed(0)+" per cent counted, the rest reckoned";
+  $("audit").innerHTML="<p>Of the "+words(D.total)+" tokens on the books, <b>"+TB.full(D.measured)+"</b> were counted directly from the logs. The remaining <b>"+TB.full(D.estimated)+"</b> are estimates, chiefly from the early days before every session kept its receipts"+(estDays?", across "+nw(estDays)+" days":"")+".</p>"+
+    '<div class="bar"><i style="width:'+mp+'%;background:#1b1a17"></i><i style="width:'+(100-mp)+'%;background:url(#)"></i></div><div class="lg"><span>■ Counted '+mp.toFixed(1)+'%</span><span>▨ Estimated '+(100-mp).toFixed(1)+"%</span></div>";
+  $("audit").querySelector(".bar i:last-child").style.background="repeating-linear-gradient(45deg,#1b1a17 0 1.5px,transparent 1.5px 5px)";
+  // classifieds
+  const blurbs=["Apply within.","No time-wasters.","References available.","Serious enquiries only.","Will burn for food.","Reasonable rates.","Hours flexible.","Owner retiring.","Must see."];
+  $("classi").innerHTML=D.models.map((m,i)=>'<div class="ad"><b><span class="sq" style="background:'+m.color+'"></span>'+esc(m.name)+'</b>Printed in this ink. <span class="t">'+TB.full(m.tokens)+'</span> tokens, '+(m.share*100).toFixed(m.share<.01?2:1)+'% share. '+blurbs[i%blurbs.length]+"</div>").join("");
+  // ticker
+  const items=["TOTAL "+TB.full(D.total),"TODAY "+TB.full(D.today),"WEEK "+TB.full(D.week)].concat(D.models.map(m=>m.name.toUpperCase()+" "+TB.fmt(m.tokens)+(seq[n-1].byModel[m.name]?" (+"+TB.fmt(seq[n-1].byModel[m.name])+" today)":""))).concat(["RECORD DAY "+dsh(best.d)+" "+TB.fmt(best.tokens),"BURN INDEX "+Math.round(heat*100)]);
+  const run=items.map(x=>"<span>"+esc(x)+"</span>").join("");$("run").innerHTML=run+run;
+  document.documentElement.style.setProperty("--tdur",(70-35*heat).toFixed(0)+"s");
+  $("colo").textContent="The Token Times is printed locally"+(D.demo?" from specimen figures":" and reprinted every minute")+". All figures in tokens.";
+  // counters + milestones
+  if(lastTotal===null){shown.total=D.total*.97;shown.today=D.today*.5;shown.week=D.week*.85;shown.since=D.since*.85}
+  setT({total:D.total,today:D.today,week:D.week,since:D.since});
+  if(lastTotal===null){if(D.today>=best.tokens&&D.today>0)stamp("Record!","Biggest day yet");else{const b=Math.floor(D.total/1e9);const crossed=seq.slice(-1)[0];let c=0,day=null;for(const x of seq){const pre=c;c+=x.tokens;if(Math.floor(pre/1e9)<b&&Math.floor(c/1e9)>=b)day=x.d}if(day&&day>=TB.iso(new Date(T-2*864e5)))stamp("Extra!",b+" billion passed");}}
+  else if(Math.floor(D.total/1e9)>Math.floor(lastTotal/1e9))stamp("Extra!",Math.floor(D.total/1e9)+" billion passed");
+  else if(Math.floor(D.total/1e8)>Math.floor(lastTotal/1e8))stamp("Late news",TB.fmt(Math.floor(D.total/1e8)*1e8)+" passed");
+  lastTotal=D.total;
+  document.querySelectorAll(".ink").forEach((e,i)=>setTimeout(()=>e.classList.add("on"),80+i*90));
+  window.__tt=()=>drawHist(D,seq);setTimeout(window.__tt,400);
+}
+let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{if(window.__tt)window.__tt()},150)});
+TB.onData(render);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Starburn Tokki Transform</title>
+<meta name="description" content="An original magical girl, Starburn Tokki, loops her henshin sequence: every token milestone you have passed unlocks a costume piece made of light, her gems are coloured by model share and today's burn sets the sparkle rate.">
+<style>
+:root{
+  --ink:#4a2a5e; --ink2:#7a5a8e; --pink:#ff7fb0; --gold:#e8a93a; --gold2:#ffd772;
+  --card:rgba(255,255,255,.58); --card2:rgba(255,255,255,.78); --line:rgba(255,255,255,.9);
+  --f:"Noto Sans CJK JP","Noto Sans","DejaVu Sans",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:#ffd9ec;color:var(--ink);font:13px/1.35 var(--f);overflow-x:hidden}
+#bg,#fx{position:fixed;inset:0;width:100%;height:100%;display:block}
+#bg{z-index:0}#fx{z-index:5;pointer-events:none}
+#app{position:relative;z-index:2;min-height:100vh;display:grid;grid-template-rows:auto 1fr auto;gap:10px;padding:12px 16px 12px}
+/* ---------- title card ---------- */
+header{position:relative;text-align:center;padding:6px 12px 8px;border-radius:22px;background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,240,250,.5));
+  border:2px solid var(--line);box-shadow:0 0 0 4px rgba(255,190,225,.35),0 10px 30px rgba(190,90,160,.18)}
+header:before,header:after{content:"";position:absolute;top:50%;width:46px;height:46px;margin-top:-23px;
+  background:conic-gradient(from 0deg,#fff,#ffd772,#fff,#ffb0d8,#fff);clip-path:polygon(50% 0,61% 39%,100% 50%,61% 61%,50% 100%,39% 61%,0 50%,39% 39%);animation:spin 6s linear infinite;opacity:.9}
+header:before{left:18px}header:after{right:18px;animation-direction:reverse}
+.kicker{font-size:12px;letter-spacing:.32em;font-weight:700;color:var(--ink2);text-transform:uppercase}
+.kicker b{color:var(--pink)}
+#total{font-weight:900;font-size:clamp(30px,6.2vw,78px);line-height:1.02;letter-spacing:.01em;font-variant-numeric:tabular-nums;
+  background:linear-gradient(100deg,#ff5fa2 0%,#ffb35a 18%,#fff2a8 26%,#ff7fc0 38%,#a879ff 55%,#62c8ff 70%,#fff 76%,#ff6fae 88%,#ffb35a 100%);
+  background-size:260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 7s linear infinite;
+  filter:drop-shadow(0 3px 0 #fff) drop-shadow(0 0 1px #c25b9b) drop-shadow(0 6px 14px rgba(200,80,160,.35));white-space:nowrap}
+.tline{display:flex;justify-content:center;align-items:baseline;gap:.5em;flex-wrap:wrap;margin-top:-2px}
+.tline .tk{font-weight:900;font-size:clamp(16px,2.2vw,26px);letter-spacing:.16em;color:#fff;-webkit-text-stroke:1.2px #d0508f;text-shadow:0 3px 0 #ff9fcb}
+.tline .tf{font-weight:900;font-size:clamp(18px,2.6vw,30px);letter-spacing:.06em;font-style:italic;
+  background:linear-gradient(90deg,#ff4f9a,#ffa53d,#ff4f9a);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 2.4s linear infinite}
+.chips{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.chip{background:var(--card2);border:1.5px solid #ffd0e6;border-radius:999px;padding:3px 12px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.chip b{color:var(--ink);font-variant-numeric:tabular-nums}
+.chip.hot b{color:#e2397f}
+#demo{display:none;color:#b04;font-weight:700}
+/* ---------- main ---------- */
+main{display:grid;grid-template-columns:minmax(230px,290px) 1fr minmax(240px,300px);gap:12px;min-height:0}
+.panel{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:10px 12px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  box-shadow:0 8px 24px rgba(170,80,150,.14);min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.panel h2{margin:0 0 6px;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink2);display:flex;justify-content:space-between;align-items:center}
+.panel h2 span{letter-spacing:0;text-transform:none;font-weight:500;color:#a07fb0;font-size:11px}
+.rows{display:flex;flex-direction:column;gap:3px;overflow:auto;min-height:0;scrollbar-width:thin}
+.gem{display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:7px;padding:3px 4px;border-radius:10px}
+.gem:hover{background:rgba(255,255,255,.6)}
+.gem i{width:18px;height:18px;transform:rotate(45deg);border-radius:4px;box-shadow:0 0 0 1.5px #fff,0 0 8px var(--c);background:linear-gradient(135deg,#fff 0%,var(--c) 45%,var(--c) 70%,rgba(0,0,0,.25) 100%)}
+.gem .nm{font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gem .bar{grid-column:2/4;height:4px;border-radius:3px;background:rgba(255,255,255,.7);overflow:hidden;margin-top:-1px}
+.gem .bar u{display:block;height:100%;border-radius:3px;background:var(--c)}
+.gem .am{text-align:right;font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap}
+.gem .am small{color:#a07fb0;margin-left:4px}
+.foot{margin-top:auto;padding-top:6px;font-size:11px;color:#9c7dad}
+/* stages */
+.st{display:grid;grid-template-columns:20px 1fr auto;gap:7px;align-items:center;padding:3px 6px;border-radius:10px;font-size:12.5px;position:relative}
+.st .ic{width:16px;height:16px;clip-path:polygon(50% 0,63% 35%,100% 38%,71% 61%,80% 100%,50% 78%,20% 100%,29% 61%,0 38%,37% 35%);background:#e9d6ef}
+.st.on .ic{background:linear-gradient(135deg,#fff3a0,#ffb43d)}
+.st.on{color:var(--ink)}
+.st.off{color:#b39cc0}
+.st .th{font-variant-numeric:tabular-nums;font-weight:700;font-size:11.5px}
+.st.now{background:linear-gradient(90deg,rgba(255,170,215,.75),rgba(255,255,255,.4));box-shadow:0 0 0 1.5px #fff inset}
+.st.now:after{content:"✦ forming";position:absolute;right:56px;font-size:10px;color:#d03c86;font-weight:700}
+.st.next{background:rgba(255,255,255,.65);display:block;padding:6px 8px;color:var(--ink);box-shadow:0 0 0 1.5px #ffc2df inset}
+.st.next .top{display:grid;grid-template-columns:20px 1fr auto;gap:7px;align-items:center}
+.st.next .ic{background:conic-gradient(#ff7fb0 var(--p),#ead7f0 0)}
+.prog{height:8px;border-radius:6px;background:#f1e3f6;margin:5px 0 3px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(120,60,140,.2)}
+.prog u{display:block;height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,#ff7fb0,#ffb35a,#fff3a0,#ff7fb0);background-size:200% 100%;animation:shine 2s linear infinite}
+.st.next small{color:#9c7dad;font-size:11px}
+/* stage */
+#stage{position:relative;min-height:0;display:flex;align-items:center;justify-content:center}
+#hero{height:100%;max-height:100%;width:auto;max-width:100%;overflow:visible;display:block}
+#cap{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);white-space:nowrap;font-weight:900;font-size:clamp(13px,1.5vw,18px);letter-spacing:.12em;color:#fff;
+  -webkit-text-stroke:1px #d0508f;text-shadow:0 2px 0 #ff9fcb,0 0 14px #fff;opacity:0;transition:opacity .25s;background:radial-gradient(ellipse at center,rgba(255,255,255,.75),rgba(255,255,255,0) 72%);padding:4px 34px}
+#cap small{display:block;text-align:center;font-size:.62em;letter-spacing:.2em;-webkit-text-stroke:0;color:#c0397f;text-shadow:0 0 6px #fff}
+#bang{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%) scale(.6);font-weight:900;font-style:italic;font-size:clamp(40px,7vw,92px);white-space:nowrap;
+  color:#fff;-webkit-text-stroke:2px #e0408f;text-shadow:0 5px 0 #ffb0d5,0 0 30px #fff,0 0 60px #ff9fd0;opacity:0;pointer-events:none;letter-spacing:.02em}
+#bang small{display:block;text-align:center;font-size:.3em;font-style:normal;letter-spacing:.4em;-webkit-text-stroke:0;color:#d43a88;text-shadow:0 0 8px #fff}
+#flash{position:fixed;inset:0;background:radial-gradient(circle at 50% 50%,#fff 0%,rgba(255,255,255,.85) 40%,rgba(255,220,240,0) 80%);opacity:0;pointer-events:none;z-index:6}
+/* ---------- footer ---------- */
+footer{display:grid;grid-template-columns:1fr minmax(240px,300px);gap:12px}
+#ribbonWrap{position:relative;height:118px;padding:8px 12px 4px}
+#ribbon{width:100%;height:100%;display:block}
+#tip{position:absolute;pointer-events:none;background:#fff;border:1.5px solid #ffc2df;border-radius:10px;padding:4px 9px;font-size:12px;white-space:nowrap;box-shadow:0 4px 14px rgba(160,60,130,.2);display:none;z-index:3}
+#tip b{font-variant-numeric:tabular-nums}
+.split{display:flex;flex-direction:column;justify-content:center;gap:6px}
+.sbar{display:flex;height:22px;border-radius:12px;overflow:hidden;box-shadow:0 0 0 2px #fff,0 3px 10px rgba(170,80,150,.2)}
+.sbar .m{background:repeating-linear-gradient(115deg,#ff8fc0 0 10px,#ffa9d0 10px 20px);position:relative}
+.sbar .e{background:repeating-linear-gradient(115deg,#d9c8ff 0 10px,#ece2ff 10px 20px)}
+.sbar div{transition:flex-basis 1.2s}
+.sleg{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.sleg b{font-variant-numeric:tabular-nums}
+.sleg .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shine{to{background-position:-260% 0}}
+/* ---------- phone ---------- */
+@media (max-width:900px){
+  main{grid-template-columns:1fr;}
+  #stage{height:min(560px,120vw);order:-1}
+  footer{grid-template-columns:1fr}
+  header:before,header:after{display:none}
+  .rows{overflow:visible}
+}
+@media (max-width:460px){
+  #app{padding:8px 10px}
+  .kicker{letter-spacing:.18em;font-size:10.5px}
+  .kicker .hs{display:none}
+  .chip{font-size:11.5px;padding:3px 9px}
+  #ribbonWrap{height:104px}
+}
+@media (min-width:901px){ #app{height:100vh} }
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div id="app">
+  <header>
+    <div class="kicker">Magical Girl <b>✦ Starburn Tokki ✦</b> 変身<span class="hs"> sequence</span> <span id="demo">· demo data</span></div>
+    <div id="total">0</div>
+    <div class="tline"><span class="tk">TOKENS</span><span class="tf">— TRANSFORM!</span></div>
+    <div class="chips">
+      <span class="chip hot">today <b id="today">0</b></span>
+      <span class="chip">this week <b id="week">0</b></span>
+      <span class="chip">forms unlocked <b id="forms">0</b></span>
+      <span class="chip">next form <b id="nextChip">–</b></span>
+    </div>
+  </header>
+  <main>
+    <section class="panel" id="gemPanel">
+      <h2>Gem power <span>by model</span></h2>
+      <div class="rows" id="gems"></div>
+      <div class="foot">Wand star &amp; heart brooch facets are cut from these shares (√-scaled so small gems still shine).</div>
+    </section>
+    <section id="stage">
+      <svg id="hero" viewBox="22 22 356 598" aria-label="Starburn Tokki"></svg>
+      <div id="cap"></div>
+      <div id="bang">TRANSFORM!<small>STARBURN · MAKE-UP</small></div>
+    </section>
+    <section class="panel">
+      <h2>Transformation <span>token milestones</span></h2>
+      <div class="rows" id="stages"></div>
+    </section>
+  </main>
+  <footer>
+    <section class="panel" id="ribbonWrap" style="padding:6px 10px 4px">
+      <h2 style="margin:0 0 0 4px;position:absolute;top:7px;left:10px;z-index:2">Star ribbon <span>· one star per day, size = tokens · hollow = estimated</span></h2>
+      <canvas id="ribbon"></canvas>
+      <div id="tip"></div>
+    </section>
+    <section class="panel split">
+      <h2>Light source</h2>
+      <div class="sbar"><div class="m" id="sm" style="flex-basis:50%"></div><div class="e" id="se" style="flex-basis:50%"></div></div>
+      <div class="sleg">
+        <span><i class="dot" style="background:#ff8fc0"></i>measured <b id="mv">–</b></span>
+        <span><i class="dot" style="background:#cdb8ff"></i>estimated <b id="ev">–</b></span>
+      </div>
+    </section>
+  </footer>
+</div>
+<canvas id="fx"></canvas>
+<div id="flash"></div>
+<script src="tb-data.js"></script>
+<script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id);
+const clamp = (x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease = x => 1-Math.pow(1-clamp(x),3);
+const easeIO = x => (x=clamp(x), x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2);
+const qs = new URLSearchParams(location.search);
+const HOLD = qs.get("hold")==="1";
+
+/* ------------------------------------------------------------------ */
+/* milestones = transformation stages                                  */
+/* ------------------------------------------------------------------ */
+const MS = [
+  {v:1e8,   key:"spark",   name:"Spark Hair",        jp:"きらめき", ax:248,ay:80, r:40},
+  {v:2.5e8, key:"ribbons", name:"Twin Ribbons",      jp:"リボン",   ax:200,ay:108,r:95},
+  {v:5e8,   key:"gloves",  name:"Light Gloves",      jp:"グローブ", ax:205,ay:280,r:110},
+  {v:1e9,   key:"wand",    name:"Star Wand",         jp:"ステッキ", ax:298,ay:92, r:55},
+  {v:2e9,   key:"boots",   name:"Comet Boots",       jp:"ブーツ",   ax:200,ay:578,r:50},
+  {v:3e9,   key:"skirt",   name:"Petal Skirt",       jp:"スカート", ax:200,ay:392,r:95},
+  {v:5e9,   key:"bodice",  name:"Bodice & Bow",      jp:"リボン胸", ax:200,ay:296,r:60},
+  {v:7.5e9, key:"brooch",  name:"Heart Brooch",      jp:"ブローチ", ax:200,ay:280,r:34},
+  {v:1e10,  key:"wings",   name:"Wings of Light",    jp:"つばさ",   ax:200,ay:300,r:160},
+  {v:1.5e10,key:"tiara",   name:"Starlight Tiara",   jp:"ティアラ", ax:200,ay:52, r:45},
+  {v:2.5e10,key:"cape",    name:"Comet Cape",        jp:"マント",   ax:200,ay:420,r:130},
+  {v:5e10,  key:"galaxy",  name:"Galaxy Form",       jp:"銀河",     ax:200,ay:330,r:190},
+];
+
+/* ------------------------------------------------------------------ */
+/* the heroine: Starburn Tokki (original design)                       */
+/* ------------------------------------------------------------------ */
+function starPath(cx,cy,ro,ri,n=5,rot=-Math.PI/2){
+  let d="";for(let i=0;i<n*2;i++){const r=i%2?ri:ro,a=rot+i*Math.PI/n;d+=(i?"L":"M")+(cx+r*Math.cos(a)).toFixed(1)+","+(cy+r*Math.sin(a)).toFixed(1)}return d+"Z";
+}
+function bow(x,y,s,fill,dark){
+  return `<g transform="translate(${x},${y}) scale(${s})">
+   <path d="M-2,4 C-8,14 -12,26 -10,36 L-3,30 L2,38 C3,26 2,14 2,4Z" fill="${fill}" stroke="${dark}" stroke-width="1.2"/>
+   <path d="M2,4 C8,14 14,24 16,34 L8,29 L5,37 C2,26 0,14 -1,4Z" fill="${fill}" stroke="${dark}" stroke-width="1.2" opacity=".95"/>
+   <path d="M0,0 C-10,-14 -30,-16 -32,-4 C-33,8 -14,10 0,2Z" fill="${fill}" stroke="${dark}" stroke-width="1.4"/>
+   <path d="M0,0 C10,-14 30,-16 32,-4 C33,8 14,10 0,2Z" fill="${fill}" stroke="${dark}" stroke-width="1.4"/>
+   <path d="M-6,-2 C-14,-8 -24,-8 -26,-3" fill="none" stroke="#fff" stroke-width="1.6" opacity=".7" stroke-linecap="round"/>
+   <path d="M6,-2 C14,-8 24,-8 26,-3" fill="none" stroke="#fff" stroke-width="1.6" opacity=".5" stroke-linecap="round"/>
+   <ellipse cx="0" cy="1" rx="6" ry="6.5" fill="${fill}" stroke="${dark}" stroke-width="1.4"/>
+   <ellipse cx="-1.5" cy="-1" rx="2.2" ry="2" fill="#fff" opacity=".7"/></g>`;
+}
+const SK="#ffeade", SKS="#f6cbbd", SKL="#c98b7d", HL="#c4477c";
+function eye(cx,flip){
+  return `<g class="eye" data-cx="${cx}"><g transform="${flip?`translate(${2*cx},0) scale(-1,1)`:""}">
+    <ellipse cx="${cx}" cy="161" rx="15.5" ry="19" fill="#fff"/>
+    <ellipse cx="${cx}" cy="163" rx="12.5" ry="16.5" fill="url(#irisG)"/>
+    <ellipse cx="${cx}" cy="160" rx="6.5" ry="9" fill="#2b1240"/>
+    <path d="M${cx-11},170 Q${cx},180 ${cx+11},170 Q${cx},175 ${cx-11},170Z" fill="#ffd2f0" opacity=".85"/>
+    <circle cx="${cx-5}" cy="153" r="4.6" fill="#fff"/>
+    <circle cx="${cx+5.5}" cy="170" r="2.2" fill="#fff"/>
+    <path d="${starPath(cx+6,156,3.2,1.2,4,0)}" fill="#fff"/>
+    <path d="M${cx-15},151 Q${cx-3},139 ${cx+10},142 Q${cx+18},144 ${cx+21},150 L${cx+25},147 L${cx+20},157 Q${cx+12},146 ${cx-2},146 Q${cx-10},147 ${cx-15},152Z" fill="#3a1d47"/>
+    <path d="M${cx-12},180 Q${cx},183 ${cx+10},179" fill="none" stroke="#7a4a7a" stroke-width="1" opacity=".6"/>
+  </g></g>`;
+}
+function buildHero(){
+  const lt = "translate(400,0) scale(-1,1)";
+  const tail = `<path d="M136,96 C78,104 56,176 70,258 C80,318 62,368 36,404 C70,398 98,370 106,326 C112,350 104,384 92,410 C124,386 132,340 124,290 C116,226 120,160 152,124Z" fill="url(#hairG)" stroke="${HL}" stroke-width="1.6"/>
+     <path d="M118,126 C92,160 84,212 92,262 M104,150 C88,190 86,230 98,282 M112,300 C116,330 110,360 96,392" fill="none" stroke="#fff" stroke-width="2" opacity=".45" stroke-linecap="round"/>`;
+  return `
+  <defs>
+    <linearGradient id="hairG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffb886"/><stop offset=".35" stop-color="#ff8fb4"/><stop offset=".8" stop-color="#e27ae0"/><stop offset="1" stop-color="#b58bff"/></linearGradient>
+    <linearGradient id="irisG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3c1866"/><stop offset=".55" stop-color="#b44fd0"/><stop offset="1" stop-color="#ffb3e8"/></linearGradient>
+    <linearGradient id="skirtG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff8fc0"/><stop offset="1" stop-color="#ffd1e8"/></linearGradient>
+    <linearGradient id="bodG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e5f4ff"/><stop offset="1" stop-color="#a9d8ff"/></linearGradient>
+    <linearGradient id="wingG" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".6" stop-color="#cfe9ff" stop-opacity=".7"/><stop offset="1" stop-color="#f6c7ff" stop-opacity=".35"/></linearGradient>
+    <linearGradient id="capeG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8f7dff"/><stop offset="1" stop-color="#ffb3dd"/></linearGradient>
+    <linearGradient id="goldG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff5b8"/><stop offset=".5" stop-color="#ffc94a"/><stop offset="1" stop-color="#e2962a"/></linearGradient>
+    <radialGradient id="galG"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".7" stop-color="#c9a8ff" stop-opacity=".25"/><stop offset="1" stop-color="#7f6bff" stop-opacity="0"/></radialGradient>
+    <clipPath id="starClip"><path d="${starPath(0,0,27,12)}"/></clipPath>
+    <clipPath id="heartClip"><path d="M0,14 C-22,0 -20,-16 -9,-16 C-4,-16 -1,-12 0,-9 C1,-12 4,-16 9,-16 C20,-16 22,0 0,14Z"/></clipPath>
+    <filter id="whiteGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feFlood flood-color="#fff"/><feComposite in2="SourceAlpha" operator="in" result="w"/>
+      <feGaussianBlur in="w" stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="w"/></feMerge></filter>
+    <filter id="ghostF" x="-10%" y="-10%" width="120%" height="120%"><feMorphology in="SourceAlpha" operator="dilate" radius="1.8" result="d"/><feFlood flood-color="#d46aae"/><feComposite in2="d" operator="in" result="o"/><feFlood flood-color="#fff" flood-opacity=".75"/><feComposite in2="SourceAlpha" operator="in" result="w"/><feMerge><feMergeNode in="o"/><feMergeNode in="w"/></feMerge></filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="2"/></filter>
+  </defs>
+  <g id="charAll"><g id="bob">
+   <g id="p-galaxy">
+     <ellipse cx="200" cy="330" rx="185" ry="290" fill="url(#galG)"/>
+     ${Array.from({length:22},(_,i)=>{const a=i/22*Math.PI*2;return `<path d="${starPath(200+175*Math.cos(a),330+270*Math.sin(a),6,2.2,4,0)}" fill="#fff" opacity=".9"/>`}).join("")}
+   </g>
+   <g id="p-cape">
+     <path d="M168,254 L232,254 C272,330 300,450 316,566 Q258,590 200,576 Q142,590 84,566 C100,450 128,330 168,254Z" fill="url(#capeG)" stroke="#7b62d8" stroke-width="1.5"/>
+     <path d="M168,254 C140,340 118,450 110,560 M232,254 C260,340 282,450 290,560" stroke="#fff" stroke-width="1.4" opacity=".35" fill="none"/>
+     ${[[130,470],[260,440],[150,380],[250,520],[200,540],[110,535],[290,545]].map(([x,y])=>`<path d="${starPath(x,y,7,3)}" fill="#fff6b0" opacity=".9"/>`).join("")}
+   </g>
+   <g id="p-wings">
+     <g id="wingL">
+      <path d="M192,292 C150,226 78,196 26,222 C58,240 70,262 58,292 C92,290 112,308 100,344 C134,336 166,318 192,302Z" fill="url(#wingG)" stroke="#fff" stroke-width="2"/>
+      <path d="M186,296 C150,262 104,240 56,232 M180,302 C150,290 118,284 84,292 M176,308 C150,312 128,322 112,336" stroke="#bcdcff" stroke-width="1.6" fill="none" opacity=".8"/>
+     </g>
+     <use href="#wingL" transform="${lt}"/>
+   </g>
+   <!-- back hair -->
+   <g id="hairBack">
+     <path d="M118,150 C106,70 168,36 200,36 C232,36 294,70 282,150 C288,214 272,252 258,272 L142,272 C128,252 112,214 118,150Z" fill="url(#hairG)" stroke="${HL}" stroke-width="1.6"/>
+     <g id="tailL">${tail}</g>
+     <g id="tailR"><g transform="${lt}">${tail}</g></g>
+   </g>
+   <!-- legs -->
+   <path d="M181,424 L197,424 L195,590 L185,590Z" fill="${SK}" stroke="${SKL}" stroke-width="1.2"/>
+   <path d="M203,424 L219,424 L215,590 L205,590Z" fill="${SK}" stroke="${SKL}" stroke-width="1.2"/>
+   <ellipse cx="188" cy="596" rx="12" ry="6" fill="#ffc1da" stroke="#d2709c"/>
+   <ellipse cx="212" cy="596" rx="12" ry="6" fill="#ffc1da" stroke="#d2709c"/>
+   <g id="p-boots">
+     <g id="bootL"><path d="M180,516 L198,516 L198,598 Q199,612 186,612 L170,612 Q164,604 176,598 L180,596Z" fill="#fff" stroke="#d2709c" stroke-width="1.4"/>
+       <path d="M178,512 L200,512 L201,526 L177,526Z" fill="url(#goldG)" stroke="#c98a2a" stroke-width="1"/>
+       <path d="M189,540 C184,535 183,530 186,529 C187.5,529 189,531 189,532 C189,531 190.5,529 192,529 C195,530 194,535 189,540Z" fill="#ff7fb0"/>
+       <path d="M171,606 L198,606" stroke="#ff9fca" stroke-width="3"/></g>
+     <use href="#bootL" transform="translate(400,0) scale(-1,1)"/>
+   </g>
+   <!-- neck + base light dress -->
+   <path d="M189,214 L211,214 L212,256 L188,256Z" fill="${SK}" stroke="${SKL}" stroke-width="1"/>
+   <path d="M189,236 Q200,246 211,236 L211,246 Q200,252 189,246Z" fill="${SKS}"/>
+   <path d="M170,248 L230,248 C240,290 238,318 227,334 L252,432 Q200,442 148,432 L173,334 C162,318 160,290 170,248Z" fill="#fff8fc" stroke="#efc6dc" stroke-width="1.5"/>
+   <path d="M176,250 Q200,264 224,250" fill="none" stroke="#f5cfe2" stroke-width="2"/>
+   <g id="p-skirt">
+     <path d="M168,334 L232,334 C254,362 278,404 294,446 Q280,462 262,452 Q248,466 232,454 Q216,468 200,456 Q184,468 168,454 Q152,466 138,452 Q120,462 106,446 C122,404 146,362 168,334Z" fill="#fff" stroke="#f0b8d4" stroke-width="1.3"/>
+     <path d="M172,332 L228,332 C250,360 270,396 284,432 Q270,446 254,436 Q240,450 226,438 Q212,451 200,440 Q188,451 174,438 Q160,450 146,436 Q130,446 116,432 C130,396 150,360 172,332Z" fill="url(#skirtG)" stroke="#e0679f" stroke-width="1.5"/>
+     <path d="M186,336 C178,372 166,404 156,432 M214,336 C222,372 234,404 244,432 M200,336 L200,438" stroke="#fff" stroke-width="1.6" opacity=".55" fill="none"/>
+     <path d="M168,334 L232,334 L236,346 L164,346Z" fill="#9fd2ff" stroke="#6aa9e0" stroke-width="1"/>
+     ${[130,165,200,235,270].map((x,i)=>`<path d="${starPath(x,428-Math.abs(200-x)*-0.02+(i%2?6:0),4.5,1.8)}" fill="#fff4a8"/>`).join("")}
+   </g>
+   <!-- arms -->
+   <g id="armL">
+     <path d="M168,264 L142,322 L126,370" fill="none" stroke="${SKL}" stroke-width="16.5" stroke-linecap="round" stroke-linejoin="round"/>
+     <path d="M168,264 L142,322 L126,370" fill="none" stroke="${SK}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+     <circle cx="123" cy="378" r="9.5" fill="${SK}" stroke="${SKL}" stroke-width="1.2"/>
+   </g>
+   <g id="armR">
+     <path d="M232,264 L268,222 L284,168" fill="none" stroke="${SKL}" stroke-width="16.5" stroke-linecap="round" stroke-linejoin="round"/>
+     <path d="M232,264 L268,222 L284,168" fill="none" stroke="${SK}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+   </g>
+   <g id="p-bodice">
+     <path d="M171,252 L229,252 C238,286 236,314 226,336 L174,336 C164,314 162,286 171,252Z" fill="url(#bodG)" stroke="#6aa9e0" stroke-width="1.5"/>
+     <path d="M174,328 L226,328 L226,338 L174,338Z" fill="url(#goldG)"/>
+     <path d="M178,256 Q200,270 222,256" fill="none" stroke="#fff" stroke-width="3"/>
+     <circle cx="165" cy="262" r="16" fill="#fff" stroke="#f0b8d4" stroke-width="1.5"/>
+     <circle cx="235" cy="262" r="16" fill="#fff" stroke="#f0b8d4" stroke-width="1.5"/>
+     <path d="M152,268 Q165,282 178,268 M222,268 Q235,282 248,268" fill="none" stroke="#ff9fca" stroke-width="3"/>
+     ${bow(200,282,1.1,"#ff6f9f","#c43d76")}
+   </g>
+   <g id="p-brooch" transform="translate(200,282)">
+     <circle r="19" fill="url(#goldG)" stroke="#c98a2a" stroke-width="1.2"/>
+     <g clip-path="url(#heartClip)"><g id="heartFacets"></g></g>
+     <path d="M0,14 C-22,0 -20,-16 -9,-16 C-4,-16 -1,-12 0,-9 C1,-12 4,-16 9,-16 C20,-16 22,0 0,14Z" fill="none" stroke="#fff" stroke-width="1.8"/>
+     <ellipse cx="-7" cy="-8" rx="4" ry="2.6" fill="#fff" opacity=".85"/>
+   </g>
+   <!-- head -->
+   <path d="M146,118 C145,168 166,206 200,227 C234,206 255,168 254,118Z" fill="${SK}" stroke="${SKL}" stroke-width="1.3"/>
+   <ellipse cx="160" cy="188" rx="11" ry="5.5" fill="#ff9fb8" opacity=".55"/>
+   <ellipse cx="240" cy="188" rx="11" ry="5.5" fill="#ff9fb8" opacity=".55"/>
+   <path d="M157,186 l4,-4 M162,187 l4,-4 M237,186 l4,-4 M242,187 l4,-4" stroke="#ff7fa0" stroke-width="1.2" opacity=".7"/>
+   <g id="eyes">${eye(174,true)}${eye(226,false)}</g>
+   
+   
+   <path d="M199,181 l1.5,2" stroke="${SKL}" stroke-width="1.4" stroke-linecap="round"/>
+   <path id="mouth" d="M190,196 Q200,210 210,196 Q200,200 190,196Z" fill="#e85a83" stroke="#b83a64" stroke-width="1.1"/>
+   <path d="M194,201 Q200,206 206,201" fill="#ff9fb4" opacity=".9"/>
+   <!-- bangs -->
+   <path d="M136,138 C126,78 164,48 200,48 C236,48 274,78 264,138 L252,116 L244,142 L230,104 L216,134 L202,98 L188,134 L172,104 L158,142 L148,116Z" fill="url(#hairG)" stroke="${HL}" stroke-width="1.6" stroke-linejoin="round"/>
+   <path d="M144,110 C134,150 136,196 152,222 C154,186 158,150 166,120Z" fill="url(#hairG)" stroke="${HL}" stroke-width="1.4"/>
+   <path d="M256,110 C266,150 264,196 248,222 C246,186 242,150 234,120Z" fill="url(#hairG)" stroke="${HL}" stroke-width="1.4"/>
+   <path d="M160,72 Q200,52 240,72" fill="none" stroke="#fff" stroke-width="4" opacity=".55" stroke-linecap="round"/>
+   <path d="M196,50 C188,36 196,24 208,26 C200,32 200,40 204,50" fill="url(#hairG)" stroke="${HL}" stroke-width="1.4"/>
+   <g id="p-spark">
+     <path d="M150,96 Q200,70 252,96" fill="none" stroke="#fff6c0" stroke-width="3" opacity=".8" stroke-linecap="round"/>
+     <path d="${starPath(248,80,13,5.5)}" fill="url(#goldG)" stroke="#c98a2a" stroke-width="1.2"/>
+     <circle cx="248" cy="80" r="3.2" fill="#fff"/>
+   </g>
+   <g id="p-ribbons">${bow(134,108,.9,"#7fc4ff","#3f86c8")}${bow(266,108,.9,"#7fc4ff","#3f86c8")}</g>
+   <g id="p-tiara">
+     <path d="M160,66 L176,50 L186,60 L200,34 L214,60 L224,50 L240,66 Q200,56 160,66Z" fill="url(#goldG)" stroke="#c98a2a" stroke-width="1.3"/>
+     <path d="${starPath(200,52,7,3)}" fill="#ff8fc0" stroke="#fff" stroke-width="1"/>
+   </g>
+   <!-- hand / gloves / wand -->
+   <g id="p-gloves">
+     <path d="M141,326 L126,370" stroke="#c9a7c0" stroke-width="17" stroke-linecap="round"/>
+     <path d="M141,326 L126,370" stroke="#fff" stroke-width="14.5" stroke-linecap="round"/>
+     <circle cx="123" cy="378" r="10" fill="#fff" stroke="#c9a7c0" stroke-width="1.2"/>
+     <path d="M130,326 Q141,336 152,328 L148,318 Q141,324 134,318Z" fill="#ff9fca" stroke="#d2709c"/>
+     <path d="M270,224 L284,168" stroke="#c9a7c0" stroke-width="17" stroke-linecap="round"/>
+     <path d="M270,224 L284,168" stroke="#fff" stroke-width="14.5" stroke-linecap="round"/>
+     <path d="M258,222 Q268,234 282,226 L280,216 Q270,222 262,212Z" fill="#ff9fca" stroke="#d2709c"/>
+   </g>
+   <g id="p-wand">
+     <path d="M285,172 L299,92" stroke="#c98a2a" stroke-width="7.5" stroke-linecap="round"/>
+     <path d="M285,172 L299,92" stroke="url(#goldG)" stroke-width="5" stroke-linecap="round"/>
+     ${bow(297,104,.42,"#ff6f9f","#c43d76")}
+     <g transform="translate(302,64)">
+       <g id="wandSpin">
+         <path d="${starPath(0,0,33,15)}" fill="url(#goldG)" stroke="#c98a2a" stroke-width="1.4"/>
+         <g clip-path="url(#starClip)"><g id="starFacets"></g></g>
+         <path d="${starPath(0,0,27,12)}" fill="none" stroke="#fff" stroke-width="1.6"/>
+         <circle r="5" fill="#fff" opacity=".9"/>
+       </g>
+     </g>
+   </g>
+   <circle id="handR" cx="286" cy="164" r="9.5" fill="${SK}" stroke="${SKL}" stroke-width="1.2"/>
+  </g></g>
+  <use id="glow" href="#charAll" filter="url(#whiteGlow)" opacity="0"/>
+  `;
+}
+const hero = $("hero");
+hero.innerHTML = buildHero();
+const piece = {}; MS.forEach(m=>piece[m.key]=$("p-"+m.key));
+const tailL=$("tailL"), tailR=$("tailR"), bob=$("bob"), glow=$("glow"), eyes=[...hero.querySelectorAll(".eye")], wandSpin=$("wandSpin"), handR=$("handR"), mouth=$("mouth");
+
+/* ------------------------------------------------------------------ */
+/* data                                                                */
+/* ------------------------------------------------------------------ */
+let D=null, shown=0, target=0, unlocked=0, weights=[];
+function nOf(t){return MS.filter(m=>t>=m.v).length}
+function facets(){
+  const ms = D.models.filter(m=>m.tokens>0);
+  const w = ms.map(m=>Math.sqrt(m.share)); const s=w.reduce((a,b)=>a+b,0)||1;
+  weights = ms.map((m,i)=>({c:m.color,w:w[i]/s,name:m.name}));
+  // star: pie wedges
+  let a=-Math.PI/2, out="";
+  for(const f of weights){const b=a+f.w*Math.PI*2, r=40, large=(b-a)>Math.PI?1:0;
+    out+=`<path d="M0,0 L${(r*Math.cos(a)).toFixed(2)},${(r*Math.sin(a)).toFixed(2)} A${r},${r} 0 ${large} 1 ${(r*Math.cos(b)).toFixed(2)},${(r*Math.sin(b)).toFixed(2)}Z" fill="${f.c}"/>`;a=b}
+  out+=`<path d="${starPath(0,0,27,12)}" fill="url(#galG)" opacity=".4"/><path d="M-30,-30 L30,30" stroke="#fff" stroke-width="6" opacity=".25"/>`;
+  $("starFacets").innerHTML=out;
+  // heart: stripes
+  let y=-17, h="";
+  for(const f of weights){const hh=f.w*32;h+=`<rect x="-24" y="${y.toFixed(2)}" width="48" height="${(hh+.3).toFixed(2)}" fill="${f.c}"/>`;y+=hh}
+  h+=`<path d="M-24,-17 L24,14" stroke="#fff" stroke-width="5" opacity=".22"/>`;
+  $("heartFacets").innerHTML=h;
+}
+function panels(){
+  const g=$("gems"); g.innerHTML="";
+  for(const m of D.models){
+    const row=document.createElement("div"); row.className="gem"; row.style.setProperty("--c",m.color);
+    row.title=m.name+": "+TB.full(m.tokens)+" tokens";
+    row.innerHTML=`<i></i><span class="nm">${m.name}</span><span class="am">${TB.fmt(m.tokens)}<small>${(m.share*100).toFixed(m.share<.01?2:1)}%</small></span><span class="bar"><u style="width:${Math.max(1.5,Math.sqrt(m.share)*100).toFixed(1)}%"></u></span>`;
+    g.appendChild(row);
+  }
+  renderStages();
+  $("today").textContent=TB.full(D.today);
+  $("week").textContent=TB.fmt(D.week);
+  $("forms").textContent=unlocked+" / "+MS.length;
+  const nx=MS[unlocked]; $("nextChip").textContent = nx? nx.name+" @ "+TB.fmt(nx.v):"all forms!";
+  $("demo").style.display=D.demo?"inline":"none";
+  const sum=D.measured+D.estimated||1;
+  $("sm").style.flexBasis=(D.measured/sum*100)+"%"; $("se").style.flexBasis=(D.estimated/sum*100)+"%";
+  $("mv").textContent=TB.fmt(D.measured)+" ("+(D.measured/sum*100).toFixed(0)+"%)";
+  $("ev").textContent=TB.fmt(D.estimated)+" ("+(D.estimated/sum*100).toFixed(0)+"%)";
+}
+let stageEls=[];
+function renderStages(){
+  const s=$("stages"); s.innerHTML=""; stageEls=[];
+  MS.forEach((m,i)=>{
+    const el=document.createElement("div");
+    if(i<unlocked){el.className="st on";el.innerHTML=`<span class="ic"></span><span>${m.name}</span><span class="th">${TB.fmt(m.v)}</span>`}
+    else if(i===unlocked){
+      const lo=i?MS[i-1].v:0, p=clamp((D.total-lo)/(m.v-lo));
+      el.className="st next"; el.style.setProperty("--p",(p*100)+"%");
+      el.innerHTML=`<div class="top"><span class="ic"></span><b>${m.name}</b><span class="th">${TB.fmt(m.v)}</span></div><div class="prog"><u style="width:${(p*100).toFixed(1)}%"></u></div><small>${(p*100).toFixed(1)}% charged · ${TB.fmt(m.v-D.total)} tokens to go</small>`;
+    } else {el.className="st off";el.innerHTML=`<span class="ic"></span><span>${m.name}</span><span class="th">${TB.fmt(m.v)}</span>`}
+    s.appendChild(el); stageEls.push(el);
+  });
+}
+let newForm=-1;
+const onD=(d=>{
+  const first=!D, prevN=unlocked;
+  D=d; target=d.total;
+  if(first){ shown=Math.max(0,d.total-Math.max(d.today,d.total*0.004)); }
+  unlocked=nOf(d.total);
+  if(!first && unlocked>prevN){ newForm=unlocked-1; loopT=0; } // milestone reached: replay the henshin
+  facets(); panels(); drawRibbonStatic=true;
+});
+
+/* ------------------------------------------------------------------ */
+/* canvases                                                            */
+/* ------------------------------------------------------------------ */
+const bg=$("bg"), bx=bg.getContext("2d"), fx=$("fx"), fxx=fx.getContext("2d");
+let W=0,H=0,DPR=1;
+function resize(){
+  DPR=Math.min(2,devicePixelRatio||1); W=innerWidth; H=innerHeight;
+  for(const c of [bg,fx]){c.width=W*DPR;c.height=H*DPR}
+  bx.setTransform(DPR,0,0,DPR,0,0); fxx.setTransform(DPR,0,0,DPR,0,0);
+  sizeRibbon();
+}
+addEventListener("resize",resize);
+const bokeh=Array.from({length:22},()=>({x:Math.random(),y:Math.random(),r:30+Math.random()*90,s:.2+Math.random()*.6,h:Math.random()}));
+const sparks=[]; const MAXS=260;
+function spark(x,y,opt={}){
+  if(sparks.length>=MAXS) sparks.shift();
+  const a=opt.a??Math.random()*Math.PI*2, v=opt.v??(20+Math.random()*60);
+  sparks.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-(opt.up||0),life:0,max:opt.max||(0.8+Math.random()*1.2),s:opt.s||(2+Math.random()*5),c:opt.c||"#fff",rot:Math.random()*3,g:opt.g??-6});
+}
+function drawStar4(ctx,x,y,s,rot){
+  ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.beginPath();
+  ctx.moveTo(0,-s);ctx.quadraticCurveTo(s*.18,-s*.18,s,0);ctx.quadraticCurveTo(s*.18,s*.18,0,s);ctx.quadraticCurveTo(-s*.18,s*.18,-s,0);ctx.quadraticCurveTo(-s*.18,-s*.18,0,-s);
+  ctx.fill();ctx.restore();
+}
+function toScreen(vx,vy){const m=hero.getScreenCTM(); return m?{x:m.a*vx+m.e,y:m.d*vy+m.f,k:m.a}:{x:0,y:0,k:1}}
+
+/* ------------------------------------------------------------------ */
+/* transformation timeline                                             */
+/* ------------------------------------------------------------------ */
+const T0=2.2, SD=1.35, FIN=1.7, HOLDT=9, OUT=1.4;
+let loopT=+(qs.get("at")||0), loops=0;
+function timeline(){const n=Math.max(1,unlocked);const tf=T0+n*SD;return{tf,th:tf+FIN+HOLDT,L:tf+FIN+HOLDT+OUT}}
+const ribbonCols=["#ff8fc0","#7fc4ff","#ffd772","#b79bff","#8ff0c8"];
+function drawHelix(ctx,a,R,p,col,t){
+  // a ribbon that spirals in and wraps around the anchor
+  const turns=2.6, N=70, head=p*turns*Math.PI*2, tail=Math.max(0,head-Math.PI*2.4);
+  const pts=[];
+  for(let i=0;i<=N;i++){
+    const th=tail+(head-tail)*i/N; const k=th/(turns*Math.PI*2);
+    const r=R*(2.6-1.6*k); const y=a.y+r*.32*Math.sin(th+t)+(1-k)*R*1.4*(a.y>H*.5?1:-1)*.3;
+    pts.push([a.x+r*Math.cos(th+t),y,Math.sin(th+t)]);
+  }
+  ctx.lineCap="round";
+  for(let i=1;i<pts.length;i++){
+    const [x0,y0]=pts[i-1],[x1,y1,z]=pts[i];
+    ctx.strokeStyle=col; ctx.globalAlpha=(.45+.45*(z>0?1:.3))*(i/pts.length);
+    ctx.lineWidth=(4+5*Math.abs(z))*Math.max(.6,a.k);
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  const h=pts[pts.length-1]; ctx.fillStyle="#fff"; drawStar4(ctx,h[0],h[1],9*Math.max(.7,a.k),t*3);
+}
+
+/* ------------------------------------------------------------------ */
+/* star ribbon (history)                                               */
+/* ------------------------------------------------------------------ */
+const rc=$("ribbon"), rx=rc.getContext("2d"); let RW=0,RH=0, rStars=[], drawRibbonStatic=true;
+function sizeRibbon(){const r=rc.getBoundingClientRect();RW=r.width;RH=r.height;rc.width=RW*DPR;rc.height=RH*DPR;rx.setTransform(DPR,0,0,DPR,0,0);drawRibbonStatic=true}
+function ribbonLayout(){
+  if(!D||!D.days.length) return;
+  const t0=new Date(D.days[0].d+"T00:00")-0, t1=new Date(D.todayISO+"T00:00")-0, span=Math.max(1,t1-t0);
+  let cum=0, mi=0; rStars=[]; const L=14, R=RW-14;
+  for(const x of D.days){
+    const before=cum; cum+=x.tokens;
+    const fr=(new Date(x.d+"T00:00")-t0)/span;
+    let dom=null,dv=-1; for(const k in x.byModel) if(x.byModel[k]>dv){dv=x.byModel[k];dom=k}
+    const ms=[]; while(mi<MS.length && cum>=MS[mi].v){ if(before<MS[mi].v) ms.push(MS[mi]); mi++ }
+    rStars.push({x:L+(R-L)*fr,day:x,dom,col:TB.color(dom),r:2.2+11*Math.sqrt(x.tokens/D.maxDay),est:x.est/Math.max(1,x.tokens),ms,today:x.d===D.todayISO});
+  }
+}
+function ribbonY(x,t){return RH*.6+Math.sin(x/RW*Math.PI*3.2+t*.6)*RH*.13}
+function drawRibbon(t){
+  if(!RW) return;
+  if(drawRibbonStatic){ribbonLayout();drawRibbonStatic=false}
+  rx.clearRect(0,0,RW,RH);
+  // satin band
+  const g=rx.createLinearGradient(0,0,RW,0);
+  g.addColorStop(0,"#ffc6e1");g.addColorStop(.5,"#d8c6ff");g.addColorStop(1,"#bfe3ff");
+  for(const [off,w,col,al] of [[0,16,g,.85],[-3,3,"#fff",.9],[5,1.5,"#fff",.5]]){
+    rx.beginPath(); for(let x=0;x<=RW;x+=6){const y=ribbonY(x,t)+off; x?rx.lineTo(x,y):rx.moveTo(x,y)}
+    rx.strokeStyle=col;rx.lineWidth=w;rx.globalAlpha=al;rx.lineCap="round";rx.stroke();
+  }
+  rx.globalAlpha=1; let lastLbl=-99;
+  for(const s of rStars){
+    const y=ribbonY(s.x,t); let r=s.r*(s.today?1+.18*Math.sin(t*5):1);
+    rx.save(); rx.translate(s.x,y); rx.rotate(Math.sin(t+s.x)*.15);
+    rx.beginPath(); const d=starPath(0,0,r,r*.45); // reuse via Path2D
+    const p=new Path2D(d);
+    if(s.est>.5){ rx.fillStyle="rgba(255,255,255,.55)"; rx.fill(p); rx.strokeStyle=s.col; rx.lineWidth=1.6; rx.stroke(p) }
+    else { rx.shadowColor=s.col; rx.shadowBlur=r>6?8:3; rx.fillStyle=s.col; rx.fill(p); rx.shadowBlur=0; rx.strokeStyle="#fff"; rx.lineWidth=1.2; rx.stroke(p) }
+    rx.restore();
+    const msl=s.ms.filter(m=>m.v>=1e9);
+    if(msl.length && s.x-lastLbl>34){ lastLbl=s.x;
+      rx.fillStyle="#c0397f"; rx.font="700 10px "+getComputedStyle(document.body).fontFamily; rx.textAlign="center";
+      rx.strokeStyle="rgba(255,255,255,.85)";rx.lineWidth=2;
+      rx.beginPath();rx.moveTo(s.x,y-r-2);rx.lineTo(s.x,y-r-12);rx.stroke();
+      const lbl=msl.map(m=>TB.fmt(m.v)).join("·"); rx.strokeText(lbl,s.x,y-r-15); rx.fillText(lbl,s.x,y-r-15);
+    }
+  }
+  if(rStars.length){const f=rStars[0],l=rStars[rStars.length-1];rx.font="10px sans-serif";rx.fillStyle="#9c7dad";rx.textAlign="left";rx.fillText(f.day.d,4,RH-3);rx.textAlign="right";rx.fillText("today",RW-4,RH-3)}
+}
+const tip=$("tip");
+function ribbonHover(e){
+  if(!rStars.length) return; const r=rc.getBoundingClientRect(); const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+  let best=null,bd=1e9; for(const s of rStars){const d=Math.abs(s.x-x);if(d<bd){bd=d;best=s}}
+  if(!best||bd>20){tip.style.display="none";return}
+  const dd=best.day; const parts=Object.entries(dd.byModel).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k} ${TB.fmt(v)}`).join(" · ");
+  tip.innerHTML=`<b>${dd.d}</b> · <b>${TB.full(dd.tokens)}</b> tokens${dd.est?` (${TB.fmt(dd.est)} est.)`:""}<br><span style="color:#9c7dad">${parts}</span>`;
+  tip.style.display="block"; const tw=tip.offsetWidth; tip.style.left=clamp(best.x+10-tw/2,0,r.width-tw)+"px"; tip.style.top="2px";
+}
+rc.addEventListener("mousemove",ribbonHover); rc.addEventListener("touchstart",ribbonHover,{passive:true}); rc.addEventListener("mouseleave",()=>tip.style.display="none");
+
+/* ------------------------------------------------------------------ */
+/* main loop                                                           */
+/* ------------------------------------------------------------------ */
+let last=performance.now(), time=0, blinkAt=2, spawnAcc=0, lastStage=-2, finFired=false, startBurst=false;
+const cap=$("cap"), bang=$("bang"), flash=$("flash"), totalEl=$("total");
+function setPiece(el,v,a,ghost){
+  if(v<=0.001 && !ghost){ if(el.style.display!=="none") el.style.display="none"; return }
+  el.style.display="";
+  if(ghost){ el.setAttribute("filter","url(#ghostF)"); el.setAttribute("opacity",(.42+.14*Math.sin(time*2.4)).toFixed(3)); el.removeAttribute("transform"); if(el.id==="p-brooch") el.setAttribute("transform","translate(200,282)"); return }
+  el.removeAttribute("filter");
+  el.setAttribute("opacity",clamp(v).toFixed(3));
+  const s=1+.25*(1-ease(v));
+  const base=el.id==="p-brooch"?"translate(200,282) ":"";
+  if(el.id==="p-brooch") el.setAttribute("transform",`translate(200,282) scale(${s.toFixed(3)})`);
+  else el.setAttribute("transform",`translate(${a.ax},${a.ay}) scale(${s.toFixed(3)}) translate(${-a.ax},${-a.ay})`);
+}
+function frame(now){
+  requestAnimationFrame(frame);
+  if(document.hidden){last=now;return}
+  const dt=Math.min(.05,(now-last)/1000); last=now; time+=dt;
+  if(!D) return;
+  const I=D.intensity||0;
+  // counter
+  shown += (target-shown)*Math.min(1,dt*1.6); if(Math.abs(target-shown)<1) shown=target;
+  totalEl.textContent=TB.full(shown);
+
+  // timeline
+  const TL=timeline(); loopT+=dt; if(HOLD) loopT=TL.tf+FIN+2.5;
+  if(loopT>=TL.L){loopT=0;loops++;newForm=-1}
+  const t=loopT, n=unlocked;
+  let stage=-1; if(t>=T0 && t<TL.tf) stage=Math.floor((t-T0)/SD);
+  // pieces
+  for(let i=0;i<MS.length;i++){
+    const m=MS[i], el=piece[m.key];
+    if(i<n){
+      let v = t<T0+i*SD+.35 ? 0 : ease((t-(T0+i*SD)-.35)/.6);
+      if(t>TL.th) v*=1-clamp((t-TL.th)/.9);
+      setPiece(el,v,m,false);
+    } else if(i===n){ setPiece(el,0,m, t>=TL.tf && t<TL.th) }
+    else setPiece(el,0,m,false);
+  }
+  // glow silhouette
+  let gl;
+  if(t<T0) gl = loops? .85 : .85*clamp(t/.9);
+  else if(t<TL.tf) gl=.85*(1-(t-T0)/(TL.tf-T0));
+  else if(t<TL.th) gl=Math.max(0,.6-(t-TL.tf)*1.2)*0;
+  else gl=.85*clamp((t-TL.th)/.9);
+  if(gl>.01){glow.style.display="";glow.setAttribute("opacity",gl.toFixed(3))} else glow.style.display="none";
+  // caption + list highlight
+  if(stage!==lastStage){
+    lastStage=stage;
+    stageEls.forEach((e,i)=>e.classList.toggle("now",i===stage));
+    if(stage>=0&&stage<n){const m=MS[stage];cap.innerHTML=`✦ ${m.name.toUpperCase()} ✦<small>${m.jp} · ${TB.fmt(m.v)} TOKENS UNLOCKED</small>`;cap.style.opacity=1}
+    else if(t<T0){cap.innerHTML=`✦ STARBURN POWER ✦<small>${TB.fmt(D.total)} TOKENS OF LIGHT</small>`;cap.style.opacity=1}
+    else cap.style.opacity=0;
+  }
+  // finale
+  const ft=t-TL.tf;
+  if(ft>=0 && ft<FIN+HOLDT){
+    const b=ft<.5?ease(ft/.5):1, out=ft>2.6?1-clamp((ft-2.6)/.6):1;
+    bang.style.opacity=(b*out).toFixed(3);
+    bang.style.transform=`translate(-50%,-50%) scale(${(.6+.5*b - .05*(1-out)).toFixed(3)}) rotate(-4deg)`;
+    bang.firstChild.textContent = newForm>=0? "NEW FORM!":"TRANSFORM!";
+    bang.lastChild.textContent = newForm>=0? MS[newForm].name.toUpperCase()+" UNLOCKED":"STARBURN · MAKE-UP";
+    flash.style.opacity=(ft<.12?ft/.12:Math.max(0,1-(ft-.12)/.7))*.85;
+    if(ft>.6 && ft<3.5){cap.style.opacity=1; if(cap.dataset.f!=="1"){cap.dataset.f="1";const nx=MS[n];cap.innerHTML=nx?`✦ ${n} FORMS ✦<small>NEXT: ${nx.name.toUpperCase()} AT ${TB.fmt(nx.v)}</small>`:`✦ ALL FORMS ✦<small>GALAXY HEROINE</small>`}}
+    else if(ft>=3.5 && cap.dataset.f==="1"){cap.dataset.f="";cap.style.opacity=0}
+  } else {bang.style.opacity=0; flash.style.opacity=0; cap.dataset.f=""}
+
+  // character idle motion
+  const sway=Math.sin(time*1.6)*(2.5+5*I);
+  tailL.setAttribute("transform",`rotate(${(sway).toFixed(2)} 138 104)`);
+  tailR.setAttribute("transform",`rotate(${(-sway*.9+Math.sin(time*2.1)).toFixed(2)} 262 104)`);
+  const lift=t<TL.tf&&t>T0? -6:0;
+  bob.setAttribute("transform",`translate(0,${(Math.sin(time*2)*3+lift).toFixed(2)})`);
+  wandSpin.setAttribute("transform",`rotate(${(Math.sin(time*1.3)*12).toFixed(2)}) scale(${(1+.04*Math.sin(time*4)).toFixed(3)})`);
+  if(time>blinkAt){ const bt=time-blinkAt; const k=bt<.09?1-bt/.09*.92:bt<.18?.08+(bt-.09)/.09*.92:1;
+    eyes.forEach(e=>{const cx=e.dataset.cx;e.setAttribute("transform",`translate(0,161) scale(1,${k.toFixed(3)}) translate(0,-161)`)}); if(bt>.18){blinkAt=time+2+Math.random()*3.5}}
+  const wv=piece.wand.style.display!=="none";
+  handR.setAttribute("fill", piece.gloves.style.display!=="none" && +piece.gloves.getAttribute("opacity")>.5 ? "#fff":SK);
+
+  // ---------- background ----------
+  const hs=Math.sin(time*.07);
+  const grd=bx.createLinearGradient(0,0,W*.4,H);
+  grd.addColorStop(0,`hsl(${330+hs*12},100%,90%)`); grd.addColorStop(.5,`hsl(${280+hs*15},90%,90%)`); grd.addColorStop(1,`hsl(${205+hs*10},95%,88%)`);
+  bx.fillStyle=grd; bx.fillRect(0,0,W,H);
+  for(const b of bokeh){
+    b.y-=b.s*dt*.02*(1+I*2); if(b.y<-.2) b.y=1.2;
+    const x=b.x*W+Math.sin(time*.3+b.h*9)*30, y=b.y*H, r=b.r;
+    const rg=bx.createRadialGradient(x,y,0,x,y,r); rg.addColorStop(0,`hsla(${300+b.h*90},100%,97%,.55)`); rg.addColorStop(1,`hsla(${300+b.h*90},100%,95%,0)`);
+    bx.fillStyle=rg; bx.beginPath(); bx.arc(x,y,r,0,7); bx.fill();
+  }
+  // magic circle behind the heroine
+  const c=toScreen(200,330), cR=Math.max(120,c.k*300);
+  const burst = t>=T0&&t<TL.tf+FIN ? 1:.55;
+  drawMagicCircle(bx,c.x,c.y,cR,time*(.12+.5*I)*(t>=T0&&t<TL.tf?2.2:1),burst);
+  const f=toScreen(200,600); drawMagicCircle(bx,f.x,f.y,cR*.6,-time*.4,burst*.9,.26);
+
+  // ---------- fx ----------
+  fxx.clearRect(0,0,W,H);
+  // ambient sparkle rate = today's intensity
+  spawnAcc += dt*(3+60*I*I);
+  while(spawnAcc>1){spawnAcc--;
+    const near=Math.random()<.65; const p= near? toScreen(60+Math.random()*280,40+Math.random()*560):{x:Math.random()*W,y:Math.random()*H};
+    const mc = weights.length&&Math.random()<.5 ? pickModel() : (Math.random()<.5?"#fff":"#fff3a0");
+    spark(p.x,p.y,{v:8+Math.random()*20,up:12,max:1+Math.random()*1.6,s:2+Math.random()*4.5,c:mc});
+  }
+  // stage ribbons + bursts
+  if(stage>=0 && stage<n){
+    const m=MS[stage], lt=(t-T0-stage*SD)/SD, a=toScreen(m.ax,m.ay);
+    if(lt<.55) drawHelix(fxx,a,m.r*a.k*.9,clamp(lt/.55),ribbonCols[stage%ribbonCols.length],time*2);
+    if(lt>.36 && lt<.36+dt/SD*1.01){ for(let k=0;k<38;k++) spark(a.x+(Math.random()-.5)*m.r*a.k,a.y+(Math.random()-.5)*m.r*a.k*.6,{v:60+Math.random()*140,s:3+Math.random()*6,c:k%3?"#fff":ribbonCols[stage%5],max:.7+Math.random()*.8,g:40}) }
+  }
+  if(t<T0 && t>.3){ // intro: light ribbons rising round her
+    const a=toScreen(200,330);
+    for(let j=0;j<2;j++) drawHelix(fxx,{x:a.x,y:a.y+ (j?60:-60)*a.k,k:a.k},150*a.k,clamp((t-.3)/(T0-.3)),j?"#b79bff":"#ff8fc0",time*1.5+j*3);
+  }
+  if(ft>=0 && ft<dt*1.01){ const a=toScreen(200,320); for(let k=0;k<160;k++) spark(a.x,a.y,{v:120+Math.random()*420,s:3+Math.random()*7,c:k%4?"#fff":pickModel(),max:1+Math.random()*1.2,g:60}) }
+  // wand trail
+  if(wv && +piece.wand.getAttribute("opacity")>.6 && Math.random()<.3+.6*I){const w=toScreen(302,64);spark(w.x+(Math.random()-.5)*20,w.y+(Math.random()-.5)*20,{v:10+Math.random()*40,c:pickModel(),s:2+Math.random()*4,max:.9})}
+  for(let i=sparks.length-1;i>=0;i--){
+    const s=sparks[i]; s.life+=dt; if(s.life>s.max){sparks.splice(i,1);continue}
+    s.vy+=s.g*dt; s.vx*=1-dt*1.5; s.vy*=1-dt*1.5; s.x+=s.vx*dt; s.y+=s.vy*dt; s.rot+=dt*2;
+    const k=s.life/s.max, al=k<.15?k/.15:1-(k-.15)/.85;
+    fxx.globalAlpha=al; fxx.fillStyle=s.c; fxx.shadowColor=s.c; fxx.shadowBlur=s.s>4?6:0;
+    drawStar4(fxx,s.x,s.y,s.s*(1-.4*k),s.rot);
+  }
+  fxx.globalAlpha=1; fxx.shadowBlur=0;
+  drawRibbon(time);
+}
+function pickModel(){let r=Math.random(),a=0;for(const w of weights){a+=w.w;if(r<=a)return w.c}return "#fff"}
+let runeText="";
+function drawMagicCircle(ctx,x,y,R,rot,br,flat=1){
+  ctx.save(); ctx.translate(x,y); ctx.scale(1,flat);
+  ctx.globalAlpha=.55*br; ctx.strokeStyle="#fff"; ctx.lineWidth=2;
+  ctx.shadowColor="#ffb0e0"; ctx.shadowBlur=10;
+  ctx.beginPath(); ctx.arc(0,0,R,0,7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,0,R*.86,0,7); ctx.stroke();
+  ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(0,0,R*.62,0,7); ctx.stroke();
+  ctx.rotate(rot);
+  // heptagram
+  ctx.beginPath(); for(let i=0;i<=7;i++){const a=i*3*Math.PI*2/7-Math.PI/2; const px=Math.cos(a)*R*.84,py=Math.sin(a)*R*.84; i?ctx.lineTo(px,py):ctx.moveTo(px,py)} ctx.stroke();
+  ctx.rotate(-rot*2);
+  ctx.beginPath(); for(let i=0;i<=4;i++){const a=i*Math.PI*2/4; const px=Math.cos(a)*R*.6,py=Math.sin(a)*R*.6; i?ctx.lineTo(px,py):ctx.moveTo(px,py)} ctx.stroke();
+  ctx.beginPath(); for(let i=0;i<=4;i++){const a=i*Math.PI*2/4+Math.PI/4; const px=Math.cos(a)*R*.6,py=Math.sin(a)*R*.6; i?ctx.lineTo(px,py):ctx.moveTo(px,py)} ctx.stroke();
+  ctx.rotate(rot*2);
+  // runes: the model names and the total, written round the ring
+  if(flat===1){
+    if(!runeText && D) runeText=(" ✦ "+D.models.map(m=>m.name.toUpperCase()).join(" ✧ ")+" ✦ "+TB.full(D.total)+" TOKENS").repeat(2);
+    const txt=runeText, N=txt.length, rr=R*.93; ctx.shadowBlur=0; ctx.fillStyle="#fff"; ctx.globalAlpha=.75*br;
+    ctx.font=`700 ${Math.max(8,Math.min(13,R*.042))}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle";
+    for(let i=0;i<N;i++){const a=i/N*Math.PI*2; ctx.save(); ctx.rotate(a); ctx.translate(0,-rr); ctx.fillText(txt[i],0,0); ctx.restore()}
+  }
+  // model gem nodes on the ring
+  if(weights.length){ctx.shadowBlur=12;weights.forEach((w,i)=>{const a=i/weights.length*Math.PI*2; ctx.globalAlpha=.9*br; ctx.fillStyle=w.c; ctx.shadowColor=w.c; ctx.beginPath(); ctx.arc(Math.cos(a)*R*.62,Math.sin(a)*R*.62,3+16*Math.sqrt(w.w)*(flat<1?.6:1),0,7); ctx.fill()})}
+  ctx.restore(); ctx.globalAlpha=1; ctx.shadowBlur=0;
+}
+resize(); TB.onData(d=>{runeText="";onD(d)}); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

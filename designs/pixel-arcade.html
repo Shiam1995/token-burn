@@ -1,0 +1,1202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixel Arcade</title>
+<meta name="description" content="A pixel-perfect 16-bit platformer: every day of token history is a brick column, coins are coloured by model, each billion summons a boss, and the total is the HI-SCORE.">
+<style>
+@font-face{font-family:"TBP2P";src:url(fonts/PressStart2P.ttf)}
+@font-face{font-family:"TBSILK";src:url(fonts/Silkscreen.ttf)}
+html,body{margin:0;height:100%;background:#07050b;overflow:hidden;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#screen{position:fixed;left:0;top:0;width:100vw;height:100vh;display:block}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<canvas id="screen" aria-label="Token Burn: a 16-bit platformer drawn from token history"></canvas>
+<div class="sr" id="sr" aria-live="polite">Loading token data</div>
+<script src="tb-data.js"></script>
+<script>
+(() => {
+"use strict";
+const SP = new URLSearchParams(location.search);
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const DBG = SP.has("debug");
+const store = { get(k) { try { return localStorage.getItem(k) } catch (e) { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch (e) {} } };
+
+/* =====================================================================
+   PALETTE: one disciplined set. Every pixel drawn comes from here.
+   ===================================================================== */
+const INK = "#140b1f", INK2 = "#1d1230", INK3 = "#2b1f45", INK4 = "#44366a", WHITE = "#fff8ec";
+const RAMPS = {
+  red:    ["#3d0a18", "#8f1d2c", "#d8363c", "#ff7a6b"],
+  orange: ["#4a1a0c", "#a8451a", "#ef7a26", "#ffb35c"],
+  gold:   ["#5a3008", "#b8720e", "#ffcc33", "#fff2a0"],
+  lime:   ["#24400f", "#4f8a1c", "#9bd13a", "#e0f78c"],
+  green:  ["#0c3a2c", "#1d7a4f", "#38d08f", "#a8f5cf"],
+  teal:   ["#0a3445", "#116a83", "#2ab9d1", "#a2eef5"],
+  blue:   ["#121f55", "#2546a8", "#4f8dff", "#a9c8ff"],
+  violet: ["#25144f", "#4d34a8", "#8d6bff", "#cbbcff"],
+  magenta:["#420c40", "#8a2280", "#e04fc7", "#ffaaec"],
+  pink:   ["#500d2a", "#a8234f", "#ff4f6d", "#ffa6b3"],
+  grey:   ["#1c2030", "#3e4560", "#7d8ba3", "#d0d7e2"],
+  sand:   ["#3a2414", "#7a4a2a", "#b8805a", "#e8c29a"],
+  steel:  ["#1a1730", "#34305a", "#5f5b8f", "#a9a6d6"]
+};
+const GOLD = ["#fff8d0", "#fff2a0", "#ffe066", "#ffcc33", "#ffcc33", "#ffb02e", "#ff8a26", "#ff8a26", "#ef6a22", "#e8452a", "#d8363c", "#b82a35"];
+const FLAMEG = ["#fff2a0", "#ffe066", "#ffcc33", "#ffb02e", "#ff8a26", "#ef6a22", "#e8452a", "#d8363c", "#b82a35", "#8f1d2c"];
+const FLAME = ["#8f1d2c", "#e8452a", "#ff8a26", "#ffcc33", "#fff2a0"];
+const C = { cream: "#fff2a0", gold: "#ffcc33", red: "#ff4f6d", redD: "#8f1d2c", cyan: "#a2eef5", cyanD: "#2ab9d1", lab: "#8d93b8", violet: "#cbbcff", violetD: "#8d6bff", grey: "#7d8ba3", mint: "#a8f5cf" };
+const PHASES = {
+  night: { sky: ["#06040f", "#0a0719", "#100b27", "#171036", "#201746", "#2c2156"], stars: 1,
+    cloud: ["#141030", "#211b48", "#342c62"], far: ["#16123a", "#1e1848"], mtn: ["#120e30", "#1d1846", "#5a5a96", "#34326a"],
+    city: ["#0c0a24", "#161338", "#231f50", "#1b1942"], win: 1, hill: ["#0a0a20", "#101234", "#191c48"], tree: ["#06061a", "#0c0f2c", "#151d44"],
+    grass: ["#0d2a30", "#16443e", "#256650"], dirt: ["#0e0916", "#191224", "#261b34"], water: ["#080c2e", "#12205e", "#2c4498"] },
+  dawn: { sky: ["#1b1446", "#3a2766", "#6b3a7a", "#b8507a", "#f08a6a", "#ffc98a"], stars: .3,
+    cloud: ["#8a4a7a", "#e08a8a", "#ffd0a8"], far: ["#7a4a7e", "#9a5a86"], mtn: ["#3a2660", "#6a3f7a", "#ffd8d0", "#c098b8"],
+    city: ["#2a1d48", "#3d2c5c", "#5a4478", "#2a1d48"], win: .5, hill: ["#24183f", "#3a2656", "#553a6e"], tree: ["#180f30", "#2a1c48", "#45305e"],
+    grass: ["#1e3040", "#2e5048", "#58805a"], dirt: ["#1c1024", "#2e1c36", "#46304a"], water: ["#2a2466", "#5a4a9a", "#f0a0a0"] },
+  day: { sky: ["#2a5fd8", "#3a74e6", "#5590f0", "#7aaef5", "#a6cbf7", "#d6ecfa"], stars: 0,
+    cloud: ["#9fb8e6", "#dce8fa", "#ffffff"], far: ["#86a6dc", "#9cb8e6"], mtn: ["#4d5fa8", "#7088c8", "#f4f8ff", "#c0cce8"],
+    city: ["#4a5a8a", "#6a7cac", "#93a6d0", "#33416e"], win: 0, hill: ["#1d6a4f", "#2f8a58", "#58b860"], tree: ["#0f4a3a", "#1d6a42", "#3a9448"],
+    grass: ["#1f6a34", "#3aa040", "#8edc58"], dirt: ["#3a2016", "#6a3c26", "#a0643a"], water: ["#1a3c9e", "#2f6ae0", "#a6d0ff"] },
+  dusk: { sky: ["#140b33", "#2a1557", "#55207a", "#9a2f7a", "#e0506a", "#ff9a5a"], stars: .6,
+    cloud: ["#4a2060", "#b04878", "#ff9a7a"], far: ["#4a1e66", "#5e2a74"], mtn: ["#2a1550", "#4a2470", "#e8a0b8", "#a06090"],
+    city: ["#1d0f3a", "#2d1850", "#43266a", "#2a1650"], win: 1, hill: ["#1a0d33", "#2a1647", "#3d2060"], tree: ["#100626", "#1a0c38", "#2a1450"],
+    grass: ["#162238", "#223c48", "#3e6052"], dirt: ["#180c22", "#2a1634", "#40244a"], water: ["#1e1050", "#3e2088", "#ff8a7a"] }
+};
+const KEYS = [[0, "night"], [4.6, "night"], [6.0, "dawn"], [7.4, "day"], [17.0, "day"], [18.4, "dusk"], [19.9, "night"], [24, "night"]];
+
+const hex = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255] };
+const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const short = n => TB.fmt(n).toUpperCase();
+function hstr(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0 } return h }
+function rng(seed) { return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 } }
+const hash = n => { n = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b) >>> 0; n ^= n >>> 13; return (Math.imul(n, 0xc2b2ae35) >>> 0) / 4294967296 };
+function hue(c) { const [r, g, b] = hex(c).map(v => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (d < .12) return -1; let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return (h * 60 + 360) % 360 }
+const mkC = (w, h, gpu = false) => { const c = document.createElement("canvas"); c.width = Math.max(1, w); c.height = Math.max(1, h); if (!gpu) c.getContext("2d", { willReadFrequently: true }); return c };
+const dateLabel = iso => MON[+iso.slice(5, 7) - 1] + " " + (+iso.slice(8));
+
+/* =====================================================================
+   TEXT: real pixel fonts (PressStart2P, Silkscreen) rasterised at their
+   native size and thresholded to 1-bit, so every glyph sits on the grid.
+   ===================================================================== */
+const G5 = {
+"0":[14,17,19,21,25,17,14],"1":[4,12,4,4,4,4,14],"2":[14,17,1,2,4,8,31],"3":[31,2,4,2,1,17,14],"4":[2,6,10,18,31,2,2],
+"5":[31,16,30,1,1,17,14],"6":[6,8,16,30,17,17,14],"7":[31,1,2,4,8,8,8],"8":[14,17,17,14,17,17,14],"9":[14,17,17,15,1,2,12],
+A:[14,17,17,31,17,17,17],B:[30,17,17,30,17,17,30],C:[14,17,16,16,16,17,14],D:[28,18,17,17,17,18,28],E:[31,16,16,30,16,16,31],
+F:[31,16,16,30,16,16,16],G:[14,17,16,23,17,17,15],H:[17,17,17,31,17,17,17],I:[14,4,4,4,4,4,14],J:[7,2,2,2,2,18,12],
+K:[17,18,20,24,20,18,17],L:[16,16,16,16,16,16,31],M:[17,27,21,21,17,17,17],N:[17,17,25,21,19,17,17],O:[14,17,17,17,17,17,14],
+P:[30,17,17,30,16,16,16],Q:[14,17,17,17,21,18,13],R:[30,17,17,30,20,18,17],S:[15,16,16,14,1,1,30],T:[31,4,4,4,4,4,4],
+U:[17,17,17,17,17,17,14],V:[17,17,17,17,17,10,4],W:[17,17,17,21,21,21,10],X:[17,17,10,4,10,17,17],Y:[17,17,17,10,4,4,4],
+Z:[31,1,2,4,8,16,31],".":[0,0,0,0,0,12,12],",":[0,0,0,0,12,4,8],":":[0,12,12,0,12,12,0],"-":[0,0,0,31,0,0,0],
+"!":[4,4,4,4,4,0,4],"?":[14,17,1,2,4,0,4],"/":[0,1,2,4,8,16,0],"+":[0,4,4,31,4,4,0],"%":[24,25,2,4,8,19,3],
+"(":[2,4,8,8,8,4,2],")":[8,4,2,2,2,4,8],">":[8,4,2,1,2,4,8],"<":[2,4,8,16,8,4,2],"'":[12,4,8,0,0,0,0],"x":[0,0,17,10,4,10,17]
+};
+function fallbackFont(id) {
+  const g = new Map();
+  for (const ch of Object.keys(G5)) { const rows = G5[ch]; let lo = 5, hi = -1;
+    for (const r of rows) for (let c = 0; c < 5; c++) if (r & (16 >> c)) { lo = Math.min(lo, c); hi = Math.max(hi, c) }
+    if (/[0-9]/.test(ch)) { lo = 0; hi = 4 }
+    const b = rows.map(r => { const a = []; for (let c = lo; c <= hi; c++) a.push(r & (16 >> c) ? 1 : 0); return a });
+    g.set(ch, { w: hi - lo + 1, adv: hi - lo + 2, b }) }
+  g.set(" ", { w: 3, adv: 4, b: Array.from({ length: 7 }, () => [0, 0, 0]) });
+  return { id, h: 7, g };
+}
+function ttfFont(id, fam, px) {
+  const c = mkC(px * 3, px * 3), x = c.getContext("2d", { willReadFrequently: true });
+  x.font = px + "px " + fam; x.textBaseline = "alphabetic";
+  const raw = new Map(); let top = 99, bot = -1;
+  const CH = " 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ.,:;-+!?/%()[]<>'*#=&_";
+  for (const ch of CH) {
+    x.clearRect(0, 0, c.width, c.height); x.fillStyle = "#fff"; x.fillText(ch, px, px * 2);
+    const adv = Math.max(1, Math.round(x.measureText(ch).width)), d = x.getImageData(0, 0, c.width, c.height).data, on = [];
+    for (let yy = 0; yy < c.height; yy++) for (let xx = 0; xx < c.width; xx++) if (d[(yy * c.width + xx) * 4 + 3] >= 128) { on.push([xx - px, yy]); if (ch !== "(" && ch !== ")" && ch !== "[" && ch !== "]" && ch !== "_") { top = Math.min(top, yy); bot = Math.max(bot, yy) } }
+    raw.set(ch, { adv, on });
+  }
+  if (bot < 0) return null;
+  const h = bot - top + 1, g = new Map();
+  for (const [ch, { adv, on }] of raw) {
+    let w = adv; for (const [xx] of on) w = Math.max(w, xx + 1);
+    const b = Array.from({ length: h }, () => new Array(w).fill(0));
+    for (const [xx, yy] of on) if (xx >= 0 && yy >= top && yy <= bot) b[yy - top][xx] = 1;
+    g.set(ch, { w, adv, b });
+  }
+  return { id, h, g };
+}
+function scale2x(b, w, h) {
+  const o = Array.from({ length: h * 2 }, () => new Array(w * 2).fill(0)), g = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? 0 : b[y][x];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const P = g(x, y), A = g(x, y - 1), B = g(x + 1, y), Cc = g(x - 1, y), D = g(x, y + 1);
+    o[2 * y][2 * x] = (Cc === A && Cc !== D && A !== B) ? A : P; o[2 * y][2 * x + 1] = (A === B && A !== Cc && B !== D) ? B : P;
+    o[2 * y + 1][2 * x] = (D === Cc && D !== B && Cc !== A) ? Cc : P; o[2 * y + 1][2 * x + 1] = (B === D && B !== A && D !== Cc) ? D : P;
+  }
+  return o;
+}
+function bigFont(f) {
+  const g = new Map();
+  for (const [ch, q] of f.g) {
+    let b = scale2x(q.b, q.w, f.h), w = q.w * 2, adv = q.adv * 2;
+    if (",.: ".includes(ch)) { let lo = w, hi = -1; for (const r of b) r.forEach((v, i) => { if (v) { lo = Math.min(lo, i); hi = Math.max(hi, i) } });
+      if (hi < 0) adv = 8; else { b = b.map(r => r.slice(lo, hi + 1)); w = hi - lo + 1; adv = w + 3 } }
+    g.set(ch, { w, adv, b });
+  }
+  return { id: f.id + "B", h: f.h * 2, g };
+}
+let FP = fallbackFont("p"), FS = fallbackFont("s"), FB = bigFont(FP), fontsReady = false;
+const getG = (f, ch) => f.g.get(ch) || f.g.get(ch.toUpperCase()) || f.g.get("?");
+const STY = new Map(), GC = new Map();
+function sty(font, fill, ol = null, sh = null) { const id = font.id + "|" + (Array.isArray(fill) ? fill.join("") : fill) + "|" + ol + "|" + sh;
+  let s = STY.get(id); if (!s) { s = { font, fill, ol, sh, id }; STY.set(id, s) } return s }
+function gcv(ch, st) {
+  const key = st.id + "\u0001" + ch; let r = GC.get(key); if (r) return r;
+  const f = st.font, q = getG(f, ch), w = q.w, h = f.h, pad = st.ol ? 1 : 0, sd = st.sh ? 1 : 0;
+  const c = mkC(w + pad * 2 + sd, h + pad * 2 + sd), x = c.getContext("2d");
+  const shape = (ox, oy, col, dil) => { x.fillStyle = col; for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (q.b[yy] && q.b[yy][xx]) { if (dil) x.fillRect(ox + xx - 1, oy + yy - 1, 3, 3); else x.fillRect(ox + xx, oy + yy, 1, 1) } };
+  if (st.sh) shape(pad + 1, pad + 1, st.sh, !!st.ol);
+  if (st.ol) shape(pad, pad, st.ol, true);
+  for (let yy = 0; yy < h; yy++) { x.fillStyle = Array.isArray(st.fill) ? st.fill[Math.min(st.fill.length - 1, Math.floor(yy * st.fill.length / h))] : st.fill;
+    for (let xx = 0; xx < w; xx++) if (q.b[yy] && q.b[yy][xx]) x.fillRect(pad + xx, pad + yy, 1, 1) }
+  r = { c, adv: q.adv, pad }; GC.set(key, r); return r;
+}
+function T(s, x, y, st) { let cx = Math.round(x); y = Math.round(y); for (const ch of String(s)) { const g = gcv(ch, st); if (ch !== " ") X.drawImage(g.c, cx - g.pad, y - g.pad); cx += g.adv } return cx }
+function TW(s, st) { s = String(s); if (!s.length) return 0; let w = 0; for (const ch of s) w += getG(st.font, ch).adv; const l = getG(st.font, s[s.length - 1]); return w - (l.adv - l.w) }
+const TC = (s, cx, y, st) => T(s, Math.round(cx - TW(s, st) / 2), y, st);
+const TR = (s, rx, y, st) => T(s, rx - TW(s, st), y, st);
+async function loadFonts() {
+  try {
+    await Promise.race([Promise.all([document.fonts.load("8px TBP2P", "0"), document.fonts.load("8px TBSILK", "A")]), new Promise((_, j) => setTimeout(() => j(new Error("timeout")), 2500))]);
+    if (!document.fonts.check("8px TBP2P") || !document.fonts.check("8px TBSILK")) throw new Error("not loaded");
+    const p = ttfFont("p", "TBP2P", 8), s = ttfFont("s", "TBSILK", 8);
+    if (p && s) { FP = p; FS = s; FB = bigFont(FP); STY.clear(); GC.clear() }
+  } catch (e) { console.warn("pixel fonts unavailable, using built-in bitmap font") }
+  fontsReady = true;
+}
+
+/* =====================================================================
+   SPRITE GRIDS
+   ===================================================================== */
+const Grid = (w, h) => ({ w, h, a: new Array(w * h).fill(null) });
+const gset = (g, x, y, c) => { x |= 0; y |= 0; if (x >= 0 && y >= 0 && x < g.w && y < g.h) g.a[y * g.w + x] = c };
+const gget = (g, x, y) => (x < 0 || y < 0 || x >= g.w || y >= g.h) ? null : g.a[y * g.w + x];
+function grect(g, x, y, w, h, c) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) gset(g, x + i, y + j, c) }
+function gline(g, x0, y0, x1, y1, c) {
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
+  for (;;) { gset(g, x0, y0, c); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx } if (e2 <= dx) { e += dx; y0 += sy } }
+}
+function gstr(g, rows, map, ox, oy) { rows.forEach((r, y) => { for (let x = 0; x < r.length; x++) { const ch = r[x]; if (ch !== "." && map[ch]) gset(g, ox + x, oy + y, map[ch]) } }) }
+function goutline(g, col, diag = false) { const b = g.a.slice(); for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) { if (b[y * g.w + x]) continue;
+  const at = (xx, yy) => xx >= 0 && yy >= 0 && xx < g.w && yy < g.h && b[yy * g.w + xx];
+  if (at(x - 1, y) || at(x + 1, y) || at(x, y - 1) || at(x, y + 1) || (diag && (at(x - 1, y - 1) || at(x + 1, y - 1) || at(x - 1, y + 1) || at(x + 1, y + 1)))) g.a[y * g.w + x] = col } }
+function gcanvas(g, flip = false) {
+  const c = mkC(g.w, g.h), x = c.getContext("2d"), im = x.createImageData(g.w, g.h);
+  for (let y = 0; y < g.h; y++) for (let xx = 0; xx < g.w; xx++) { const v = g.a[y * g.w + (flip ? g.w - 1 - xx : xx)]; if (!v) continue;
+    const [r, gg, b] = hex(v), i = (y * g.w + xx) * 4; im.data[i] = r; im.data[i + 1] = gg; im.data[i + 2] = b; im.data[i + 3] = 255 }
+  x.putImageData(im, 0, 0); return c;
+}
+function gflash(g, col) { const o = Grid(g.w, g.h); for (let i = 0; i < g.a.length; i++) o.a[i] = g.a[i] ? (g.a[i] === INK ? INK : col) : null; return o }
+
+/* ---------------- hero: original flame-haired runner, 22x27 ---------------- */
+const HC = { K: INK, S: "#ffd3a8", s: "#e8996c", t: "#b0604a", R: "#c8282e", O: "#ff7a1f", Y: "#ffc93c", W: "#fff3b0",
+  J: "#3f7cff", j: "#2448b8", l: "#9cc2ff", C: "#3fd99a", c: "#1d8a62", P: "#2c2650", p: "#4b3f80", N: "#ef3b52", n: "#9a1d3c", w: "#f2eeff", E: "#ffffff", B: "#ff8fa0", G: "#ffcc33" };
+const HEAD = [
+  "......Y...Y.....",
+  ".....YOY.YOY.Y..",
+  "...YYOOOYOOOYOY.",
+  "..YOOOOOOOOOOOO.",
+  ".ROOOOOOYOOOOYO.",
+  ".RROOOOOOOOOOOOO",
+  "RRRROOOORROOROO.",
+  "RRRRSSSSRSSSSRS.",
+  "RRRSSSSSSSSKESS.",
+  ".RRStSSSSSSKKSSS",
+  ".RRStSSSSSSSSBS.",
+  "..RRSSSSSSSSStS.",
+  "....SSSSSSSSSS.."];
+const TORSO = [
+  ".CCCCCC.",
+  "cCCCCCCC",
+  "lJJJJJJj",
+  "lJJJGJJj",
+  "lJJJJJJj",
+  "PPPPPPPp"];
+const HW = 22, HH = 27;
+function heroFrame(p) {
+  const g = Grid(HW, HH), b = p.bob || 0;
+  const thick = (x0, y0, x1, y1, c) => { gline(g, x0, y0, x1, y1, c); gline(g, x0 + 1, y0, x1 + 1, y1, c) };
+  const thickK = (x0, y0, x1, y1) => { for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 2; dx++) gline(g, x0 + dx, y0 + dy, x1 + dx, y1 + dy, INK) };
+  const leg = (hx, L, near) => { const [kx, ky, fx, fy] = L, hy = 20 + b;
+    if (near) { thickK(hx, hy + 1, kx, ky); thickK(kx, ky, fx, fy - 2); grect(g, fx - 2, fy - 2, 7, 4, INK) }
+    thick(hx, hy, kx, ky, near ? HC.P : HC.p); thick(kx, ky, fx, fy - 2, near ? HC.S : HC.s);
+    grect(g, fx - 1, fy - 1, 4, 1, near ? HC.N : HC.n); gset(g, fx - 1, fy - 1, near ? HC.w : HC.l); grect(g, fx - 1, fy, 5, 1, near ? HC.n : "#5e1430") };
+  const arm = (sx, sy, A, near) => { const [ex, ey, hx, hy] = A;
+    if (near) { thickK(sx, sy + 1, ex, ey); thickK(ex, ey, hx, hy); grect(g, hx - 1, hy - 1, 4, 4, INK) }
+    thick(sx, sy, ex, ey, near ? HC.J : HC.j); thick(ex, ey, hx, hy, near ? HC.S : HC.s);
+    grect(g, hx, hy, 2, 2, near ? HC.S : HC.s); gset(g, hx + 1, hy + 1, near ? HC.s : HC.t) };
+  arm(9, 16 + b, p.fa, false);
+  leg(10, p.fl, false);
+  gstr(g, TORSO, HC, 8, 14 + b);
+  gstr(g, HEAD, HC, 4, 1 + b);
+  const ey = 1 + b, ex = 4;
+  if (p.eye === "happy") { for (const [xx, yy, c] of [[11, 8, "S"], [12, 8, "S"], [11, 9, "S"], [12, 9, "S"], [10, 9, "K"], [11, 8, "K"], [12, 9, "K"]]) gset(g, ex + xx, ey + yy, HC[c]) }
+  else if (p.eye === "shut") { for (const [xx, yy, c] of [[11, 8, "S"], [12, 8, "S"], [11, 9, "K"], [12, 9, "K"]]) gset(g, ex + xx, ey + yy, HC[c]) }
+  if (p.mouth) { gset(g, ex + 13, ey + 11, INK); gset(g, ex + 13, ey + 12, HC.n) }
+  leg(13, p.nl, true);
+  arm(14, 16 + b, p.na, true);
+  goutline(g, INK);
+  return { c: gcanvas(g), bob: b };
+}
+const POSE = {
+  idle: { bob: 0, nl: [13, 23, 13, 26], fl: [10, 23, 10, 26], na: [15, 18, 15, 20], fa: [8, 18, 8, 20] },
+  idle2: { bob: 1, nl: [13, 24, 13, 26], fl: [10, 24, 10, 26], na: [15, 19, 15, 21], fa: [8, 19, 8, 21] },
+  run: [
+    { bob: 0, nl: [16, 22, 17, 26], fl: [9, 23, 6, 24], na: [12, 18, 10, 20], fa: [12, 18, 15, 18] },
+    { bob: 1, nl: [15, 23, 14, 26], fl: [10, 22, 7, 23], na: [13, 19, 12, 21], fa: [10, 18, 13, 19] },
+    { bob: 0, nl: [13, 23, 11, 26], fl: [13, 21, 13, 23], na: [15, 19, 16, 20], fa: [8, 18, 8, 20] },
+    { bob: 0, nl: [12, 22, 9, 24], fl: [13, 22, 14, 26], na: [17, 17, 19, 16], fa: [7, 18, 5, 19] },
+    { bob: 1, nl: [13, 22, 10, 23], fl: [12, 23, 11, 26], na: [16, 18, 18, 18], fa: [8, 18, 7, 20] },
+    { bob: 0, nl: [16, 21, 16, 23], fl: [10, 23, 8, 26], na: [15, 19, 15, 21], fa: [9, 18, 10, 20] }],
+  jump: { bob: 0, nl: [16, 21, 15, 24], fl: [11, 22, 8, 24], na: [17, 13, 18, 10], fa: [8, 14, 6, 12], mouth: 1 },
+  fall: { bob: 0, nl: [15, 22, 16, 25], fl: [10, 22, 8, 25], na: [17, 15, 19, 13], fa: [7, 15, 5, 13], mouth: 1 },
+  land: { bob: 2, nl: [16, 23, 15, 26], fl: [9, 24, 9, 26], na: [16, 20, 18, 21], fa: [7, 20, 6, 21] },
+  cheer: { bob: 0, nl: [14, 23, 15, 26], fl: [9, 23, 8, 26], na: [16, 12, 17, 9], fa: [8, 12, 7, 9], eye: "happy", mouth: 1 }
+};
+let HERO = null;
+function buildHero() {
+  HERO = { idle: [heroFrame(POSE.idle), heroFrame(POSE.idle2)], blink: heroFrame(Object.assign({}, POSE.idle, { eye: "shut" })),
+    run: POSE.run.map(heroFrame), jump: heroFrame(POSE.jump), fall: heroFrame(POSE.fall), land: heroFrame(POSE.land), cheer: heroFrame(POSE.cheer), ball: [] };
+  for (let r = 0; r < 4; r++) { // curled spin-jump ball, 4 rotations
+    const g = Grid(16, 16), a0 = r * Math.PI / 2;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const dx = x - 7.5, dy = y - 7.5, d = Math.hypot(dx, dy); if (d > 6.4) continue;
+      const ang = Math.atan2(dy, dx) - a0, u = ((ang % 6.283) + 6.283) % 6.283;
+      let c = u < 2.1 ? HC.O : u < 2.6 ? HC.Y : u < 4.4 ? HC.J : u < 5.2 ? HC.S : HC.R;
+      if (d > 5.2 && c === HC.J) c = HC.j; if (d < 2.2) c = HC.C; if (dx + dy < -6 && c !== HC.C) c = HC.W;
+      gset(g, x, y, c) }
+    goutline(g, INK); HERO.ball.push(gcanvas(g));
+  }
+}
+
+/* ---------------- coins (model-coloured), mini coin, gem ---------------- */
+const COIN = new Map();
+function coinSet(rn) {
+  if (COIN.has(rn)) return COIN.get(rn);
+  const r = RAMPS[rn], frames = [];
+  for (const w of [8, 6, 4, 2, 4, 6]) {
+    const g = Grid(10, 10), rx = w / 2;
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const dx = (x + .5 - 4) / rx, dy = (y + .5 - 4) / 4; if (dx * dx + dy * dy > 1.02) continue;
+      let c = dx < -.4 ? r[3] : dx > .45 ? r[1] : r[2];
+      if (w === 2) c = x === 3 ? r[3] : r[1];
+      if (y === 7 || (dy > .55 && dx > 0)) c = r[1];
+      if (w >= 6 && y >= 2 && y <= 5) { if (x === 3) c = r[1]; if (x === 4 && w === 8) c = r[3] }
+      gset(g, x + 1, y + 1, c) }
+    if (w >= 6) gset(g, 1 + Math.round(4 - rx + 1), 2, WHITE);
+    goutline(g, INK); frames.push(gcanvas(g));
+  }
+  const m = Grid(7, 7); for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) { const d = Math.hypot(x - 2, y - 2); if (d > 2.5) continue; gset(m, x + 1, y + 1, x + y < 3 ? r[3] : x + y > 5 ? r[1] : r[2]) }
+  goutline(m, INK);
+  const s = { frames, mini: gcanvas(m) }; COIN.set(rn, s); return s;
+}
+
+/* ---------------- bricks: measured (bright bricks) vs estimated (dithered stone) ---------------- */
+let PAT = {};
+function brickPat(rn) {
+  if (PAT[rn]) return PAT[rn];
+  const r = RAMPS[rn], g = Grid(16, 8);
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 16; x++) { const course = y >> 2, yy = y & 3, xo = (x + (course ? 4 : 0)) & 7, bi = ((x + (course ? 4 : 0)) >> 3) + course * 3;
+    let c = r[2]; if (yy === 3 || xo === 7) c = r[0]; else if (yy === 0) c = r[3]; else if (xo === 0) c = r[3]; else if (xo === 6 || (yy === 2 && xo >= 3)) c = r[1];
+    if (yy === 1 && xo === 2 + (bi % 3) && c === r[2]) c = r[3];
+    gset(g, x, y, c) }
+  const e = Grid(8, 8);
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { let c = ((x + y) & 1) ? r[1] : r[2];
+    if (y === 7 || x === 7) c = r[0]; else if (y === 0 || x === 0) c = r[3]; else if (x === 6 || y === 6) c = r[1];
+    if ((x === 2 && y === 2) || (x === 3 && y === 3)) c = r[0];
+    gset(e, x, y, c) }
+  PAT[rn] = { m: X.createPattern(gcanvas(g), "repeat"), e: X.createPattern(gcanvas(e), "repeat"), mc: gcanvas(g), ec: gcanvas(e) };
+  return PAT[rn];
+}
+function patFill(p, x, y, w, h, ox, oy) { if (w <= 0 || h <= 0) return; p.setTransform(new DOMMatrix([1, 0, 0, 1, ox, oy])); X.fillStyle = p; X.fillRect(x, y, w, h) }
+
+/* ---------------- bug enemy (walks on rest-day bridges) ---------------- */
+const BUGC = { A: "#ffa6b3", a: "#ff4f6d", d: "#a8234f", H: "#2b1f45", h: "#44366a", E: WHITE, L: "#2b1f45", s: "#fff2a0" };
+const BUGF = [[
+  "............",
+  ".K....aaaa..",
+  "..K..aaaAAa.",
+  "..hH.aaasAAa",
+  ".hEHHaaaaaAa",
+  ".HHHHadaaaaa",
+  "..HHdaaaadaa",
+  "...L..L..L..",
+  "..L..L..L..."], [
+  "............",
+  "..K...aaaa..",
+  "..K..aaaAAa.",
+  "..hH.aaasAAa",
+  ".hEHHaaaaaAa",
+  ".HHHHadaaaaa",
+  "..HHdaaaadaa",
+  "...L..L..L..",
+  "....L..L..L."]];
+let BUG = [], BUGDEAD = null;
+function buildBug() {
+  const map = Object.assign({ K: INK }, BUGC);
+  BUG = BUGF.map(rows => { const g = Grid(14, 11); gstr(g, rows, map, 1, 1); goutline(g, INK); return gcanvas(g) });
+  const g = Grid(14, 11); gstr(g, BUGF[0].slice().reverse(), map, 1, 1); goutline(g, INK); BUGDEAD = gcanvas(g);
+}
+
+/* ---------------- furnace creatures: billion guardians + the big boss ---------------- */
+function furnace(W, H, fr, ramp, eyeR, big) {
+  const g = Grid(W, H), bx0 = Math.round(W * .12), bx1 = W - 1 - bx0, by0 = Math.round(H * (big ? .2 : .16)), by1 = H - 1 - Math.round(H * .12), rad = Math.max(2, Math.round(W * .11));
+  for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) {
+    const dx = Math.max(bx0 + rad - x, x - (bx1 - rad), 0), dy = Math.max(by0 + rad - y, y - (by1 - rad), 0); if (dx * dx + dy * dy > rad * rad + 1) continue;
+    let c = ramp[2];
+    if (y - by0 < 2 || x - bx0 < 2) c = ramp[3];
+    if (by1 - y < 3 || bx1 - x < 2) c = ramp[1];
+    else if (y > by0 + (by1 - by0) * .62 && (y - by0) / (by1 - by0) * 16 - 9 > BAYER[y & 3][x & 3]) c = ramp[1];
+    gset(g, x, y, c) }
+  const seam = by0 + Math.round((by1 - by0) * .22);
+  for (let x = bx0 + 2; x <= bx1 - 2; x++) { gset(g, x, seam, ramp[1]); gset(g, x, seam + 1, ramp[3]) }
+  if (big) for (const [rx, ry] of [[bx0 + 3, by0 + 2], [bx1 - 3, by0 + 2], [bx0 + 3, by1 - 4], [bx1 - 3, by1 - 4]]) { gset(g, rx, ry, ramp[3]); gset(g, rx, ry + 1, ramp[0]) }
+  // eyes: angry slant, glowing
+  const ew = Math.max(3, Math.round(W * .17)), eh = Math.max(2, Math.round(H * (big ? .12 : .14))), eyY = seam + (big ? 4 : 2), gap = Math.max(1, Math.round(W * .05));
+  for (const side of [-1, 1]) {
+    const x0 = side < 0 ? Math.round(W / 2) - gap - ew : Math.round(W / 2) + gap;
+    for (let yy = -1; yy <= eh; yy++) for (let xx = -1; xx <= ew; xx++) gset(g, x0 + xx, eyY + yy, INK);
+    for (let yy = 0; yy < eh; yy++) for (let xx = 0; xx < ew; xx++) {
+      const inner = side < 0 ? xx : ew - 1 - xx, cut = Math.round((ew - 1 - inner) * .0 + inner * (big ? .6 : .5));
+      if (yy < Math.round(inner * (eh / ew) * .9)) continue; // slanted brow
+      gset(g, x0 + xx, eyY + yy, yy === eh - 1 ? eyeR[1] : yy === 0 || cut < 0 ? eyeR[3] : eyeR[2]) }
+    const px = side < 0 ? x0 + ew - 2 : x0 + 1; gset(g, px, eyY + eh - 1, INK); if (big) { gset(g, px + (side < 0 ? 1 : -1), eyY + eh - 1, INK); gset(g, px, eyY + eh - 2, INK) }
+  }
+  // grille mouth with fire behind
+  const my0 = eyY + eh + (big ? 3 : 2), my1 = by1 - (big ? 4 : 2), mx0 = Math.round(W * .3), mx1 = W - 1 - mx0;
+  if (my1 > my0) { for (let y = my0 - 1; y <= my1 + 1; y++) for (let x = mx0 - 1; x <= mx1 + 1; x++) gset(g, x, y, INK);
+    for (let y = my0; y <= my1; y++) for (let x = mx0; x <= mx1; x++) if (((x - mx0) & 1) === 0) gset(g, x, y, y === my0 ? FLAME[3 + ((x + fr) & 1)] : (y - my0 + x + fr) % 3 === 0 ? FLAME[2] : FLAME[1]) }
+  if (big) { // chimney + side fans + thrusters
+    const cx = Math.round(W / 2); grect(g, cx - 4, by0 - 5, 8, 6, ramp[2]); grect(g, cx - 4, by0 - 5, 8, 1, ramp[3]); grect(g, cx + 2, by0 - 4, 2, 5, ramp[1]); grect(g, cx - 5, by0 - 6, 10, 2, ramp[1]); grect(g, cx - 5, by0 - 6, 10, 1, ramp[3]);
+    const fy = by0 + Math.round((by1 - by0) * .45);
+    for (const side of [-1, 1]) { const fx = side < 0 ? bx0 - 3 : bx1 + 1;
+      grect(g, fx, fy - 1, 3, 3, ramp[1]); gset(g, fx + 1, fy, ramp[3]);
+      if (fr & 1) { gline(g, fx + 1, fy - 6, fx + 1, fy - 2, ramp[3]); gline(g, fx + 1, fy + 2, fx + 1, fy + 6, ramp[2]) }
+      else { gline(g, fx - 2 + (side > 0 ? 4 : 0), fy - 4, fx + 3 - (side > 0 ? 0 : 4), fy + 4, ramp[3]) } }
+    for (const nx of [Math.round(W * .3), Math.round(W * .62)]) { grect(g, nx, by1 + 1, 6, 2, ramp[1]); grect(g, nx + 1, by1 + 3, 4, 1, ramp[0]) }
+  } else { // little wings
+    const wy = by0 + 2;
+    for (const side of [-1, 1]) { const wx = side < 0 ? bx0 - 1 : bx1 + 1, up = fr & 1;
+      for (let i = 0; i < 4; i++) { gset(g, wx + side * i, wy + (up ? -i : i) - 1, WHITE); gset(g, wx + side * i, wy + (up ? -i : i), RAMPS.violet[3]); if (i < 3) gset(g, wx + side * i, wy + (up ? -i : i) + 1, RAMPS.violet[2]) } }
+  }
+  goutline(g, INK);
+  return g;
+}
+let BOSS = null, MINI = null;
+function buildFurnaces() {
+  BOSS = { n: [0, 1].map(f => gcanvas(furnace(48, 44, f, RAMPS.steel, RAMPS.gold, true))), f: gcanvas(gflash(furnace(48, 44, 0, RAMPS.steel, RAMPS.gold, true), WHITE)) };
+  MINI = { n: [0, 1].map(f => gcanvas(furnace(20, 20, f, RAMPS.orange, RAMPS.gold, false))), f: gcanvas(gflash(furnace(20, 20, 0, RAMPS.orange, RAMPS.gold, false), WHITE)) };
+}
+
+/* ---------------- sparkle shapes ---------------- */
+const SPARK = [[[0, 0]], [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]], [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, 2], [0, -2]], [[1, 1], [-1, -1], [1, -1], [-1, 1]]];
+function spark(x, y, f, col = C.cream) { X.fillStyle = col; for (const [dx, dy] of SPARK[f]) X.fillRect(x + dx, y + dy, 1, 1); if (f === 2) { X.fillStyle = WHITE; X.fillRect(x, y, 1, 1) } }
+function disc(cx, cy, r, col) { X.fillStyle = col; for (let dy = -r; dy <= r; dy++) { const w = Math.floor(Math.sqrt(r * r - dy * dy + r * .8)); X.fillRect(cx - w, cy + dy, 2 * w + 1, 1) } }
+
+/* =====================================================================
+   CANVASES + LAYOUT
+   ===================================================================== */
+const screen = document.getElementById("screen"), SCX = screen.getContext("2d", { alpha: false });
+let bloomS = mkC(100, 60), bloomTick = 0;
+const src = mkC(400, 225), X = src.getContext("2d", { alpha: false, willReadFrequently: true });
+let LW = 400, LH = 225, S = 3, DPR = 1, OX = 0, OY = 0, L = {}, scanC = null;
+let crt = SP.has("crt") ? SP.get("crt") !== "0" : store.get("tb-arcade-crt") !== "0";
+const CW = 16;
+
+function layout() {
+  const wide = LW >= 340;
+  L = { wide };
+  const n = Math.min(10, MODELS.length || 10);
+  if (wide) { L.hudH = 40; L.botH = 64 }
+  else { L.hudH = 60; L.botH = 92 + n * 10 }
+  L.pf = { x: 0, y: L.hudH, w: LW, h: LH - L.hudH - L.botH };
+  if (!wide && L.pf.h > 330) { const extra = L.pf.h - 330; L.pf.h = 330; L.botH += extra }
+  L.gH = 14; L.base = L.pf.y + L.pf.h - L.gH;
+  L.heroSX = Math.round(LW * (wide ? .3 : .28));
+  L.hmax = clamp(L.base - L.pf.y - 62, 24, 230);
+  L.mH = clamp(Math.round(L.pf.h * .58), 48, 200);
+}
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1);
+  const Wd = Math.round(innerWidth * DPR), Hd = Math.round(innerHeight * DPR);
+  screen.width = Wd; screen.height = Hd;
+  const narrow = innerWidth < 600 && innerHeight > innerWidth * 1.1;
+  S = narrow ? Math.max(1, Math.floor(Wd / 220)) : Math.max(1, Math.floor(Math.min(Wd / 400, Hd / 236)));
+  LW = Math.floor(Wd / S); LH = Math.floor(Hd / S);
+  OX = Math.floor((Wd - LW * S) / 2); OY = Math.floor((Hd - LH * S) / 2);
+  src.width = LW; src.height = LH; X.imageSmoothingEnabled = false; PAT = {};
+  layout(); buildLayers(); recolor(true); heights();
+  if (hero.y === 0 || hero.y > L.base) hero.y = L.base;
+  // CRT: scanlines + soft vignette baked at device resolution (never resamples the art)
+  scanC = mkC(LW * S, LH * S, true); const sx = scanC.getContext("2d");
+  if (S >= 3) { const a = S >= 5 ? .24 : .2; sx.fillStyle = "rgba(6,3,12," + a + ")"; for (let y = 0; y < LH; y++) sx.fillRect(0, y * S + S - 1, LW * S, 1);
+    if (S >= 4) { sx.fillStyle = "rgba(6,3,12,.07)"; for (let y = 0; y < LH; y++) sx.fillRect(0, y * S + S - 2, LW * S, 1) } }
+  else if (S === 2) { sx.fillStyle = "rgba(6,3,12,.14)"; for (let y = 0; y < LH; y++) sx.fillRect(0, y * S + 1, LW * S, 1) }
+  const vg = sx.createRadialGradient(LW * S / 2, LH * S / 2, Math.min(LW, LH) * S * .45, LW * S / 2, LH * S / 2, Math.hypot(LW, LH) * S * .56);
+  vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(4,2,10,.34)"); sx.fillStyle = vg; sx.fillRect(0, 0, LW * S, LH * S);
+  bloomS = mkC(Math.ceil(LW / 4), Math.ceil(LH / 4));
+}
+
+/* =====================================================================
+   BACKGROUND: index strips coloured per time of day (dithered blends)
+   ===================================================================== */
+const PER = 512;
+let LY = null, PHC = PHASES.night, phaseKey = "", PHB = null;
+function hourNow() { const h = SP.get("hour"); if (h !== null && h !== "") return (+h) % 24; const d = new Date(); return d.getHours() + d.getMinutes() / 60 }
+function phaseAt(h) {
+  for (let i = 0; i < KEYS.length - 1; i++) if (h <= KEYS[i + 1][0]) { const t = (h - KEYS[i][0]) / (KEYS[i + 1][0] - KEYS[i][0]); return { A: PHASES[KEYS[i][1]], B: PHASES[KEYS[i + 1][1]], t: Math.round(clamp(t, 0, 1) * 32) / 32 } }
+  return { A: PHASES.night, B: PHASES.night, t: 0 };
+}
+function strip(w, h, fn) { const a = new Uint8Array(w * h); fn((x, y, s) => { x |= 0; y |= 0; if (x >= 0 && y >= 0 && x < w && y < h) a[y * w + x] = s }, h); return { w, h, a } }
+const q5 = v => Math.min(255, Math.round(v / 8) * 8 + (v > 4 ? 4 : 0));
+const mixc = (a, b, t) => { const A = hex(a), B = hex(b); return [0, 1, 2].map(i => q5(A[i] + (B[i] - A[i]) * t)) };
+function colorize(st, A, B, t) {
+  const c = mkC(st.w, st.h), x = c.getContext("2d"), im = x.createImageData(st.w, st.h), cl = A.map((a, i) => mixc(a, B[i], t));
+  for (let y = 0; y < st.h; y++) for (let xx = 0; xx < st.w; xx++) { const s = st.a[y * st.w + xx]; if (!s) continue;
+    const col = cl[s - 1], i = (y * st.w + xx) * 4;
+    im.data[i] = col[0]; im.data[i + 1] = col[1]; im.data[i + 2] = col[2]; im.data[i + 3] = 255 }
+  x.putImageData(im, 0, 0); return c;
+}
+const ridge = (x, k, ph) => 1 - Math.abs(Math.sin(Math.PI * k * x / PER + ph));
+const wave = (x, k, ph) => Math.sin(2 * Math.PI * k * x / PER + ph);
+function buildLayers() {
+  const mH = L.mH;
+  const fH = Math.round(mH * .8);
+  const far = strip(PER, fH, (put, h) => { for (let x = 0; x < PER; x++) { const v = .45 + .3 * ridge(x, 3, .7) + .17 * ridge(x, 7, 2.1) + .08 * wave(x, 13, .3), t = Math.round(h - v * h * .95);
+    for (let y = t; y < h; y++) put(x, y, y === t ? 2 : 1) } });
+  const mtn = strip(PER, mH, (put, h) => { const Hf = x => h * (.42 + .34 * ridge(x, 2, .2) + .16 * ridge(x, 5, 1.3) + .06 * ridge(x, 11, 2.7)) * .97;
+    for (let x = 0; x < PER; x++) { const hx = Hf(x), lit = Hf((x + 1) % PER) - Hf((x - 1 + PER) % PER) > 0, t = Math.round(h - hx), snowLine = h * .66;
+      const snowD = hx > snowLine ? Math.round((hx - snowLine) * .8 + hash(x * 7) * 2) : 0;
+      for (let y = t; y < h; y++) { const d = y - t; let s = lit ? 2 : 1;
+        if (d < snowD) s = lit ? 3 : 4; else if (d === snowD && snowD > 0 && (x & 1)) s = lit ? 3 : 4;
+        else if (y > h - 14 && ((y - (h - 14)) * 1.2 > BAYER[y & 3][x & 3])) s = 1;
+        if (d === 0 && lit && !snowD) s = 4;
+        put(x, y, s) } } });
+  const cH = Math.round(mH * .5), wins = [];
+  const city = strip(PER, cH, (put, h) => { const r = rng(4242); let x = 0;
+    while (x < PER - 4) { const w = 8 + Math.floor(r() * 14), bh = Math.round(h * (.3 + r() * .65)), t = h - bh, w2 = Math.min(w, PER - x);
+      for (let i = 0; i < w2; i++) for (let y = t; y < h; y++) { let s = 2; if (i >= w2 - 2) s = 1; if (i === 0 || y === t) s = 3; put(x + i, y, s) }
+      if (r() < .35) { const ax = x + 2 + Math.floor(r() * (w2 - 4)); for (let y = t - 4; y < t; y++) put(ax, y, 3); wins.push({ x: ax, y: t - 5, beacon: 1 }) }
+      if (r() < .25 && w2 > 10) for (let i = 2; i < w2 - 2; i++) put(x + i, t - 1, 1);
+      for (let wy = t + 3; wy < h - 2; wy += 4) for (let wx = x + 2; wx < x + w2 - 3; wx += 3) { put(wx, wy, 4); put(wx, wy + 1, 4); wins.push({ x: wx, y: wy, s: r() }) }
+      x += w2 + (r() < .3 ? 2 : 0) } });
+  const hH = Math.round(mH * .44);
+  const hill = strip(PER, hH, (put, h) => { const r = rng(777);
+    const HY = x => Math.round(h * (.46 + .14 * wave(x, 3, .5) + .07 * wave(x, 7, 1.9) + .03 * wave(x, 17, .4)));
+    for (let x = 0; x < PER; x++) { const t = h - HY(x); for (let y = t; y < h; y++) { let s = 2; if (y === t) s = 3; else if ((y - t) > 5 && ((y - t - 5) * 1.3 > BAYER[y & 3][x & 3])) s = 1; put(x, y, s) } }
+    for (let x = 2; x < PER - 2; x += 3 + Math.floor(r() * 5)) { const t = h - HY(x), th = 7 + Math.floor(r() * 9);
+      if (r() < .78) { for (let k = 0; k < th; k++) { const hw = Math.floor((th - k) / 3.2 + (k % 3 === 0 ? 1 : 0)); for (let i = -hw; i <= hw; i++) put(x + i, t - k, i < 0 ? 6 : i > 0 && i >= hw - 1 ? 4 : 5) } put(x, t - th, 6) }
+      else { const rr = 3 + Math.floor(r() * 2); for (let dy = -rr; dy <= rr; dy++) for (let dx = -rr; dx <= rr; dx++) if (dx * dx + dy * dy <= rr * rr + 1) put(x + dx, t - rr - 1 + dy, dx + dy < -1 ? 6 : dx + dy > 2 ? 4 : 5); put(x, t, 4) } } });
+  // ground tile (16 x gH): grass lip + dirt with stones
+  const gt = strip(16, L.gH, (put, h) => { for (let y = 0; y < h; y++) for (let x = 0; x < 16; x++) { let s = 2;
+      if (y === 0) s = 6; else if (y === 1) s = (x % 5 === 2) ? 6 : 5; else if (y === 2) s = (x & 1) ? 4 : 5; else if (y === 3) s = (x % 3 === 0) ? 4 : 3;
+      else { s = ((x + (y >> 2) * 3) % 8 === 0 || ((y & 3) === 0 && (x + y) % 6 < 3)) ? 1 : 2; if ((x === 5 && y === 7) || (x === 12 && y === 10) || (x === 2 && y === 11)) s = 3; if ((x === 6 && y === 8) || (x === 13 && y === 11)) s = 1 }
+      put(x, y, s) } });
+  const clouds = [], cr = rng(31), cTop = L.pf.y + 6, cBot = Math.max(cTop + 20, L.base - mH - 2);
+  const nC = clamp(Math.round((cBot - cTop) * LW / 3200), 3, 12);
+  for (let i = 0; i < nC; i++) { const nearC = i % 3 === 0, w = nearC ? 44 + Math.floor(cr() * 26) : 20 + Math.floor(cr() * 18), h = Math.round(w * .36);
+    const blobs = []; for (let b = 0; b < 5; b++) blobs.push([w * (.18 + .64 * b / 4) + (cr() - .5) * 4, h * .62 - cr() * h * .3, h * (.3 + cr() * .28)]);
+    const st = strip(w, h, (put) => { for (let y = 0; y < h - 1; y++) for (let x = 0; x < w; x++) { let inside = false, top = 1e9;
+      for (const [bx, by, br] of blobs) if ((x - bx) ** 2 + (y - by) ** 2 <= br * br) { inside = true; top = Math.min(top, y - (by - br)) }
+      if (!inside) continue; let s = 2; const f = y / h; if (f > .7 || (f > .55 && BAYER[y & 3][x & 3] > 7)) s = 1; else if (top < 2.2 && x < w * .75) s = 3; put(x, y, s) } });
+    clouds.push({ st, x: cr() * (LW + 80), y: Math.round(cTop + cr() * (cBot - cTop - 10)), par: nearC ? .1 : .04, drift: nearC ? 3 : 1.4 }) }
+  clouds.sort((a, b) => a.par - b.par);
+  const sr = rng(9), stars = []; for (let i = 0; i < Math.round(LW * L.pf.h / 300); i++) stars.push([Math.floor(sr() * LW), Math.floor(L.pf.y + sr() * (L.base - mH * .5 - L.pf.y)), sr() * 6.28, sr() < .12]);
+  const fg = strip(PER, L.gH + 10, (put, h) => { const r = rng(1234); // foreground bushes, sparse, rising over the ground line
+    for (let x = 10; x < PER - 30; x += 70 + Math.floor(r() * 90)) { const blobs = [], nb = 2 + Math.floor(r() * 3);
+      for (let b = 0; b < nb; b++) blobs.push([x + b * 7 + r() * 3, h - 3 - r() * 4, 5 + r() * 4]);
+      for (let y = 0; y < h; y++) for (let xx = x - 10; xx < x + nb * 7 + 12; xx++) { let inside = false, edge = 9;
+        for (const [bx, by, br] of blobs) { const d = Math.hypot(xx - bx, (y - by) * 1.1); if (d <= br) { inside = true; edge = Math.min(edge, d - (br - 1.6)) } }
+        if (!inside) continue;
+        const lx = blobs.some(([bx, by, br]) => Math.hypot(xx - bx + 1.5, (y - by + 1.8) * 1.1) <= br - 1.2);
+        put(xx, y, edge > 0 && !lx ? 1 : lx && hash(xx * 31 + y * 7) < .06 ? 4 : lx ? 3 : 2) } } });
+  LY = { far, mtn, city, hill, gt, clouds, stars, wins, fH, cH, hH, fg };
+  phaseKey = "";
+}
+function recolor(force) {
+  const h = hourNow(), P = phaseAt(h), key = P.A === P.B ? (P.A === PHASES.night ? "n" : "d") + P.t : KEYS.findIndex(k => PHASES[k[1]] === P.A) + ":" + P.t + ":" + (P.B === PHASES.day ? 1 : 0);
+  const k2 = key + "|" + LW + "x" + LH; if (!force && k2 === phaseKey) return; phaseKey = k2;
+  const A = P.A, B = P.B, t = P.t;
+  PHB = P; PHC = {}; for (const k of ["grass", "dirt", "water"]) PHC[k] = A[k].map((a, i) => "#" + mixc(a, B[k][i], t).map(v => v.toString(16).padStart(2, "0")).join(""));
+  // sky: bands + ordered dither, blended between phases with a second dither
+  const sh = L.pf.h, sky = mkC(LW, sh), sx = sky.getContext("2d"), im = sx.createImageData(LW, sh), bands = A.sky.map((a, i) => mixc(a, B.sky[i], t)), nb = bands.length - 1;
+  const top = 0, bot = L.base - L.pf.y - L.mH * .25;
+  for (let y = 0; y < sh; y++) { const f = clamp((y - top) / (bot - top), 0, 1), v = Math.pow(f, 1.1) * nb, i = Math.min(nb - 1, Math.floor(v)), fr = v - i;
+    for (let x = 0; x < LW; x++) { const th = BAYER[y & 3][x & 3] + .5, c = bands[fr * 16 > th ? i + 1 : i], o = (y * LW + x) * 4;
+      im.data[o] = c[0]; im.data[o + 1] = c[1]; im.data[o + 2] = c[2]; im.data[o + 3] = 255 } }
+  sx.putImageData(im, 0, 0);
+  const cl = LY.clouds.map(c => Object.assign(c, { c: colorize(c.st, A.cloud, B.cloud, t) }));
+  const isDayish = h >= 5.8 && h < 19.6;
+  // sun or moon
+  const R = clamp(Math.round(L.pf.h * (isDayish ? .075 : .06)), 6, 16), sz = R * 2 + 9, g = Grid(sz, sz), c0 = sz / 2 - .5, warm = (h < 8 || h > 16.8);
+  for (let y = 0; y < sz; y++) for (let x = 0; x < sz; x++) { const d = Math.hypot(x - c0, y - c0);
+    if (d <= R) { let c;
+      if (!isDayish) { c = "#e8ecff"; if (Math.hypot(x - c0 + R * .3, y - c0 + R * .2) < R * .28 || Math.hypot(x - c0 - R * .2, y - c0 - R * .35) < R * .2) c = "#b9c0e0"; if (x - c0 > R * .55 - (y - c0) * .1) c = "#c9cfee" }
+      else if (!warm) { c = d < R - 2 ? "#fff8e0" : "#ffe066" }
+      else { const f = (y - (c0 - R)) / (2 * R); c = f < .3 ? "#fff2a0" : f < .5 ? "#ffcc33" : f < .7 ? "#ff8a26" : "#ff4f6d"; if (f > .55 && Math.floor((y - c0) * 1.3) % 3 === 0) continue }
+      gset(g, x, y, c) }
+    else if (d <= R + 3 && (x + y) % 2 === 0) gset(g, x, y, !isDayish ? "#2e2a66" : warm ? "#ffb35c" : "#d6ecfa") }
+  LY.c = { sky, far: colorize(LY.far, A.far, B.far, t), mtn: colorize(LY.mtn, A.mtn, B.mtn, t), city: colorize(LY.city, A.city, B.city, t),
+    hill: colorize(LY.hill, A.hill.concat(A.tree), B.hill.concat(B.tree), t), gt: colorize(LY.gt, A.dirt.concat(A.grass), B.dirt.concat(B.grass), t),
+    fg: colorize(LY.fg, [INK].concat(A.tree.slice(0, 2), [A.grass[2]]), [INK].concat(B.tree.slice(0, 2), [B.grass[2]]), t), sun: gcanvas(g), isDay: isDayish, stars: A.stars + (B.stars - A.stars) * t, win: A.win + (B.win - A.win) * t, clouds: cl };
+  LY.c.gtP = X.createPattern(LY.c.gt, "repeat");
+}
+
+/* =====================================================================
+   DATA -> WORLD
+   ===================================================================== */
+let D = null, MODELS = [], world = [], todayK = 0, gateK = 0, bossK = -1, maxBill = 0, CHUNK = 1e8, firstD = null, NLEAD = 5;
+let shown = 0, animFrom = 0, animTo = 0, animT0 = 0, animDur = 1, counting = false, lastBillion = 0, prevTotal = null, prevToday = null, digitBump = [];
+let scroll = 0, speed = 0, lap = 0, credits = 0, flash = 0, shakeA = 0, shk = [0, 0], bump = 0, introT = 0, fastF = 0;
+const hero = { y: 0, vy: 0, ground: true, ft: 0, land: 0, cheer: 0, spin: 0, big: false, dx: 0, idleT: 0 };
+let parts = [], flyers = [], pops = [], rockets = [], banner = null, fight = null, cheerHold = 0, iris = null, bossDone = false, goalLap = -1, coinFx = [];
+let hover = null, warpTo = -1, modelCount = 10;
+function rampFor(list) {
+  const used = new Set(), names = Object.keys(RAMPS).filter(k => !["sand", "grey", "steel"].includes(k));
+  for (const m of list) {
+    const h = hue(m.color); let best = "grey";
+    if (h >= 0) { const dist = n => { const d = Math.abs(hue(RAMPS[n][2]) - h); return Math.min(d, 360 - d) };
+      const cands = names.filter(n => !used.has(n)).sort((a, b) => dist(a) - dist(b)); if (cands.length) best = cands[0] }
+    if (best !== "grey") used.add(best);
+    m.rn = best; m.ramp = RAMPS[best]; m.coin = coinSet(best);
+  }
+}
+function onData(d) {
+  const first = !D; D = d;
+  const wk = TB.iso(new Date(Date.now() - 6 * 864e5)), old = new Map(MODELS.map(m => [m.name, m]));
+  MODELS = d.models.map((m, i) => ({ name: m.name, tokens: m.tokens, share: m.share, color: m.color, rank: i, flash: old.get(m.name) ? old.get(m.name).flash : 0 }));
+  rampFor(MODELS);
+  for (const m of MODELS) { let days = 0, best = 0, bestD = null, week = 0;
+    for (const x of d.days) { const v = x.byModel[m.name] || 0; if (v > 0) { days++; if (v > best) { best = v; bestD = x.d } if (x.d >= wk) week += v } }
+    Object.assign(m, { days, best, bestD, week }) }
+  buildWorld(d);
+  if (MODELS.length !== modelCount) { modelCount = MODELS.length; resize() }
+  const now = performance.now() / 1000;
+  if (first) { animFrom = Math.max(0, d.total - d.today); animDur = RM ? .01 : 2.6; counting = true; lastBillion = Math.floor(animFrom / 1e9); introT = 0 } else { animFrom = shown; animDur = 1.6; counting = false }
+  animTo = d.total; animT0 = now;
+  if (prevTotal != null && d.total > prevTotal) {
+    const delta = d.total - prevTotal, n = Math.min(12, Math.max(2, Math.ceil(delta / CHUNK)));
+    for (let i = 0; i < n; i++) flyers.push({ x: Math.random() * LW, y: L.pf.y + 10 + Math.random() * 30, tx: LW / 2, ty: 22, t: -i * .07, dur: .9, rn: MODELS[0] ? MODELS[0].rn : "gold" });
+    pops.push({ s: "+" + short(delta), x: LW / 2, y: L.pf.y + 4, life: 2.6, st: sty(FP, C.mint, INK) });
+    const b0 = Math.floor(prevTotal / 1e9), b1 = Math.floor(d.total / 1e9), h0 = Math.floor(prevTotal / 1e8), h1 = Math.floor(d.total / 1e8);
+    if (b1 > b0) startFight(b1, true); else if (h1 > h0) fanfare(h1);
+  }
+  if (prevToday != null && d.today > prevToday) { const c = world[todayK]; if (c) for (let i = 0; i < c.coins.length; i++) if (i >= (c.prevN || 0)) c.coins[i].pop = 1 }
+  prevTotal = d.total; prevToday = d.today;
+  document.getElementById("sr").textContent = "Total tokens " + TB.full(d.total) + ". Today " + TB.full(d.today) + ". This week " + TB.full(d.week) + ". Measured " + TB.full(d.measured) + ", estimated " + TB.full(d.estimated) + ". " + MODELS.map(m => m.name + " " + TB.full(m.tokens)).join(", ");
+}
+function buildWorld(d) {
+  const keep = new Map(world.filter(c => c.kind === "day").map(c => [c.d, c]));
+  const prevTodayN = world[todayK] && world[todayK].coins ? world[todayK].coins.length : 0;
+  world = [];
+  for (let i = 0; i < NLEAD; i++) world.push({ kind: "lead", h: 0, i, coins: [] });
+  const byD = {}; for (const x of d.days) byD[x.d] = x;
+  const start = new Date(d.firstDay + "T00:00"), end = new Date(d.todayISO + "T00:00"); firstD = start;
+  const ch = [1e6, 2.5e6, 5e6, 1e7, 2.5e7, 5e7, 1e8, 2.5e8, 5e8, 1e9, 2.5e9, 5e9];
+  CHUNK = ch.find(c => d.maxDay / c <= 7.5) || 1e10;
+  let cum = 0, ri = 0; maxBill = 0; bossK = -1;
+  for (let t = start; t <= end; t = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)) {
+    const k = TB.iso(t), x = byD[k] || { tokens: 0, est: 0, byModel: {} };
+    const segs = MODELS.filter(m => x.byModel[m.name] > 0).map(m => ({ m, v: x.byModel[m.name] })).sort((a, b) => b.v - a.v);
+    const before = cum; cum += x.tokens;
+    const col = { kind: "day", d: k, date: t, t: x.tokens, est: x.est > x.tokens / 2, estV: x.est || 0, segs, top: segs[0] ? segs[0].m : null, h: 0, sg: [], coins: [], bill: 0, cum };
+    const b1 = Math.floor(cum / 1e9); if (b1 > Math.floor(before / 1e9)) { col.bill = b1; if (b1 >= maxBill) { maxBill = b1 } }
+    if (x.tokens > 0) { // coins: 1 per CHUNK, coloured by model (largest remainder)
+      const isToday = k === d.todayISO, n = clamp(Math.round(x.tokens / CHUNK), 1, isToday ? 10 : 8);
+      const q = segs.map(s => ({ m: s.m, f: s.v / x.tokens * n })); q.forEach(z => z.n = Math.floor(z.f)); let rem = n - q.reduce((a, z) => a + z.n, 0);
+      q.slice().sort((a, b) => (b.f - b.n) - (a.f - a.n)).forEach(z => { if (rem > 0) { z.n++; rem-- } });
+      const old = keep.get(k); let j = 0;
+      for (const z of q) for (let i = 0; i < z.n; i++) { col.coins.push({ m: z.m, got: old && old.coins[j] ? old.coins[j].got : false }); j++ }
+    } else if (ri++ % 5 === 2) { const o = keep.get(k); col.bug = o && o.bug ? o.bug : { alive: true, ph: Math.random() * 6 } }
+    world.push(col);
+  }
+  todayK = world.length - 1; world[todayK].today = true; world[todayK].prevN = prevTodayN;
+  for (let k = 0; k < world.length; k++) { const c = world[k]; if (c.bill) { if (c.bill === maxBill) bossK = k; else { const o = keep.get(c.d); c.mini = o && o.mini ? o.mini : { alive: true } } } }
+  gateK = world.length; world.push({ kind: "gate", h: 0, coins: [] });
+  for (let i = 0; i < 7; i++) world.push({ kind: "post", h: 0, i, coins: [] });
+  heights();
+}
+function heights() {
+  if (!D || !world.length) return;
+  for (const c of world) if (c.kind === "day") {
+    c.h = c.t > 0 ? Math.max(10, Math.round(10 + Math.sqrt(c.t / D.maxDay) * (L.hmax - 10))) : 0;
+    c.sg = []; if (c.t > 0) { const body = c.h - 3; let acc = 0, prev = 0;
+      for (const s of c.segs) { acc += s.v; const y = Math.round(body * acc / c.t); if (y > prev) c.sg.push({ rn: s.m.rn, y0: prev, y1: y }); prev = y } }
+  }
+}
+const colAt = wx => world[clamp(Math.floor(wx / CW), 0, world.length - 1)];
+function coinPos(k, j, n) { const c = world[k], per = 2, row = Math.floor(j / per), inRow = Math.min(per, n - row * per);
+  return { x: k * CW + (inRow === 1 ? 4 : (j % per) * 8) + 1, y: L.base - c.h - 12 - row * 9 - (c.today ? 12 + Math.round(D.intensity * 16) : 0) } }
+
+/* =====================================================================
+   EVENTS
+   ===================================================================== */
+function shake(a) { if (!RM) shakeA = Math.max(shakeA, a) }
+function puff(x, y, n, cols, spread = 1) { for (let i = 0; i < n && parts.length < 420; i++) parts.push({ x, y, vx: (Math.random() - .5) * 30 * spread, vy: -Math.random() * 14 * spread, g: -6, life: .35 + Math.random() * .3, max: .65, col: cols[i % cols.length], kind: "puff" }) }
+function burst(x, y, n, ramps, v = 70) { for (let i = 0; i < n && parts.length < 420; i++) { const a = Math.random() * 6.283, s = v * (.4 + Math.random() * .6), r = ramps[i % ramps.length];
+  parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, g: 50, life: .7 + Math.random() * .8, max: 1.5, col: r[3], col2: r[2], kind: "fw", px: x, py: y }) } }
+function boom(x, y, r = 6) { if (parts.length < 420) parts.push({ x, y, vx: 0, vy: 0, g: 0, life: .45, max: .45, r, kind: "boom" }) }
+function coinRain(x, y, n) { for (let i = 0; i < n && coinFx.length < 60; i++) { const m = MODELS[i % Math.max(1, Math.min(MODELS.length, 6))]; coinFx.push({ x, y, vx: (Math.random() - .5) * 140, vy: -80 - Math.random() * 120, life: 1.6 + Math.random() * .6, rn: m ? m.rn : "gold", f: Math.random() * 6, b: 0 }) } }
+const topRamps = () => (MODELS.length ? MODELS.slice(0, 5).map(m => m.ramp) : [RAMPS.gold]);
+function fireworks(n) { for (let i = 0; i < n; i++) rockets.push({ x: Math.round(LW * (.15 + .7 * Math.random())), y: L.base, vy: -150 - Math.random() * 70, fuse: .45 + i * .16 + Math.random() * .1, ramp: topRamps()[i % topRamps().length] }) }
+function fanfare(h) { banner = { s: h % 10 === 0 ? (h / 10) + " BILLION" : (h / 10).toFixed(1) + "B", sub: "100M MILESTONE BONUS", life: 3, col: "gold" }; fireworks(5); shake(3); flash = .18 }
+function startFight(b, live) {
+  if (fight) return;
+  const hx = scroll + L.heroSX, k = live ? Math.floor((hx + 64) / CW) : bossK, c = world[clamp(k, 0, world.length - 1)];
+  const wx = live ? hx + 72 : bossK * CW + CW / 2 + 4, top = L.base - (c ? c.h : 0);
+  fight = { b, live, t: 0, ph: "enter", hp: 3, hit: 0, wx, wy: Math.max(L.pf.y + 30, Math.min(top - 26, hero.y - 40)), y: L.pf.y - 60, fl: 0, gnd: hero.y };
+  banner = { s: "WARNING", sub: b + " BILLION BOSS", life: 1.6, col: "red", blink: 1 };
+}
+
+/* =====================================================================
+   UPDATE
+   ===================================================================== */
+function update(dt, now) {
+  if (!D || !world.length) return;
+  introT += dt;
+  // score counter
+  const p = clamp((now - animT0) / animDur, 0, 1), e = counting ? 1 - Math.pow(1 - p, 2.2) : 1 - Math.pow(1 - p, 3);
+  const before = TB.full(shown); shown = animFrom + (animTo - animFrom) * e; const after = TB.full(shown);
+  if (before !== after) { const a = after.padStart(16), b = before.padStart(16); for (let i = 0; i < 16; i++) if (a[i] !== b[i]) digitBump[i] = .09 }
+  for (let i = 0; i < digitBump.length; i++) if (digitBump[i] > 0) digitBump[i] -= dt;
+  if (counting) { const bil = Math.floor(shown / 1e9); if (bil > lastBillion) { lastBillion = bil; bump = .12; for (let i = 0; i < 6; i++) parts.push({ x: LW / 2 + (Math.random() - .5) * 170, y: 14 + Math.random() * 16, vx: 0, vy: -10, g: 0, life: .45, max: .45, col: C.cream, kind: "spark" }) }
+    if (p >= 1) { counting = false; shake(2); flash = .2; burst(LW / 2, 22, 40, topRamps(), 110) } }
+  const I = D.intensity;
+  // pacing: stop for the boss, for the goal cheer and during the iris wipe
+  let target = (38 + I * 52) * (fastF > 0 ? 3 : 1);
+  if (fight || cheerHold > 0 || (iris && iris.ph === "close") || introT < 1.2) target = 0;
+  if (warpTo >= 0) { scroll = Math.max(0, warpTo * CW - L.heroSX + 2); hero.y = L.base - colAt(scroll + L.heroSX).h; hero.vy = 0; hero.ground = true; warpTo = -1; puff(L.heroSX, hero.y - 10, 10, [C.cream, C.violet]) }
+  speed += (target - speed) * Math.min(1, dt * (target ? 3 : 8));
+  scroll += speed * dt; fastF = Math.max(0, fastF - dt); cheerHold = Math.max(0, cheerHold - dt);
+  const hx = scroll + L.heroSX;
+  const topAt = wx => L.base - colAt(wx).h;
+  const effTop = wx => { const k = clamp(Math.floor(wx / CW), 0, world.length - 1), c = world[k]; let t = L.base - c.h;
+    if (c.mini && c.mini.alive) t -= 26; if (c.bug && c.bug.alive) { const bx = k * CW + 8 + Math.sin(now * 1.3 + c.bug.ph) * 3; if (Math.abs(wx - bx) < 7) t -= 10 } return t };
+  let gnd = 1e9; for (let a = hx - 3; a <= hx + 3; a += 2) gnd = Math.min(gnd, topAt(a));
+  const G_ = 900;
+  if (fight && fight.ph === "fight") { /* hero is scripted below */ }
+  else if (hero.ground) {
+    let hi = gnd, dist = 0; for (let a = hx + 5; a < hx + 5 + Math.max(24, speed * .62); a += 2) { const t = effTop(a); if (t < hi) { hi = t; dist = a - (hx + 5) } }
+    const need = hero.y - hi;
+    if (need > 1 && speed > 5) { const tUp = Math.sqrt(2 * (need + 8) / G_); if (dist <= speed * tUp * .9 + 2) { hero.vy = -Math.sqrt(2 * G_ * (need + 8)); hero.ground = false; hero.big = need > 40; hero.spin = 0; puff(L.heroSX - 2, hero.y, 4, [RAMPS.grey[3], RAMPS.grey[2]]) } }
+    else if (gnd > hero.y + 1) { hero.ground = false; hero.vy = 0; hero.big = false; hero.fallFrom = hero.y }
+    else hero.y = gnd;
+  }
+  if (!hero.ground && !(fight && fight.ph === "fight")) {
+    if (hero.vy < 0) hero.fallFrom = Math.min(hero.fallFrom ?? hero.y, hero.y);
+    hero.vy += G_ * dt; hero.y += hero.vy * dt; hero.spin += dt;
+    // stomps
+    if (hero.vy > 0) { const k = Math.floor(hx / CW);
+      for (let kk = k - 1; kk <= k + 1; kk++) { const c = world[kk]; if (!c) continue;
+        if (c.mini && c.mini.alive) { const my = L.base - c.h - 14, mx = kk * CW + CW / 2;
+          if (Math.abs(hx - mx) < 11 && hero.y >= my - 9 && hero.y <= my + 6) { c.mini.alive = false; hero.vy = -300; hero.fallFrom = hero.y; shake(3); flash = .1;
+            boom(mx, my, 7); burst(mx, my, 26, [RAMPS.gold, RAMPS.orange], 90); coinRain(mx, my, 6);
+            pops.push({ s: c.bill + " BILLION!", x: mx - scroll, y: my - 30, life: 1.8, st: sty(FP, GOLD, INK, RAMPS.red[0]) }) } }
+        if (c.bug && c.bug.alive) { const bx = kk * CW + 8 + Math.sin(now * 1.3 + c.bug.ph) * 3;
+          if (Math.abs(hx - bx) < 8 && hero.y >= L.base - 10) { c.bug.alive = false; c.bug.dieT = 0; c.bug.dx = bx; hero.vy = -200; puff(bx - scroll, L.base - 4, 6, [C.cream, RAMPS.pink[3]]);
+            pops.push({ s: "BUG FIXED", x: bx - scroll, y: L.base - 30, life: 1.1, st: sty(FS, C.mint, INK) }) } } } }
+    if (hero.vy >= 0 && hero.y >= gnd) { const drop = hero.y - (hero.fallFrom ?? hero.y); hero.y = gnd; hero.vy = 0; hero.ground = true; hero.big = false; hero.fallFrom = undefined;
+      if (drop > 12) { hero.land = .12; puff(L.heroSX, gnd, 6, [RAMPS.grey[3], RAMPS.grey[2], RAMPS.grey[1]], 1.3); if (drop > 70) shake(2) } }
+  }
+  if (!fight && hero.ground && hero.y > gnd + 1) hero.y = gnd;
+  hero.land = Math.max(0, hero.land - dt); hero.cheer = Math.max(0, hero.cheer - dt);
+  hero.ft += dt * (speed > 4 ? 5 + speed / 8 : 2); hero.idleT = speed < 4 ? hero.idleT + dt : 0;
+  if (hero.ground && speed > 20 && Math.random() < dt * (3 + I * 6)) puff(L.heroSX - 4, hero.y, 1, [RAMPS.grey[3], RAMPS.grey[2]], .5);
+  // coins
+  const kh = Math.floor(hx / CW);
+  for (let k = kh - 1; k <= kh + 1; k++) { const c = world[k]; if (!c || !c.coins.length) continue;
+    c.coins.forEach((cn, j) => { if (cn.got) return; const pp = coinPos(k, j, c.coins.length), cx = pp.x + 4, cy = pp.y + 4;
+      if (Math.abs(cx - hx) < 10 && cy > hero.y - 42 && cy < hero.y + 4) { cn.got = true; credits++; cn.m.flash = .5;
+        if (flyers.length < 40) flyers.push({ x: cx - scroll, y: cy, tx: LW / 2 + (Math.random() - .5) * 80, ty: 22, t: 0, dur: .65 + Math.random() * .2, rn: cn.m.rn });
+        for (let q = 0; q < 5; q++) parts.push({ x: cx - scroll, y: cy, vx: (Math.random() - .5) * 50, vy: -Math.random() * 40, g: 90, life: .4, max: .4, col: q & 1 ? cn.m.ramp[3] : C.cream, kind: "spark" });
+        const p0 = pops.find(q => q.coin && q.life > .4); if (p0) { p0.n++; p0.s = "+" + short(CHUNK * p0.n); p0.life = .9 }
+        else pops.push({ s: "+" + short(CHUNK), n: 1, coin: 1, x: L.heroSX + 6, y: Math.max(L.pf.y + 6, hero.y - 50), life: .9, st: sty(FS, C.cream, INK) }) } }) }
+  // the boss on the latest billion day
+  if (bossK >= 0 && !bossDone && !fight && hx >= bossK * CW - 58 && hx < bossK * CW) startFight(maxBill, false);
+  if (fight) updateFight(dt, now, hx, gnd);
+  // reaching today
+  if (hx >= todayK * CW + CW / 2 && goalLap !== lap && !fight) { goalLap = lap; hero.cheer = 1.3; cheerHold = 1.4; shake(3); flash = .14; fireworks(5);
+    banner = { s: "TODAY", sub: TB.full(D.today) + " TOKENS", life: 3, col: "gold" } }
+  // warp gate -> iris wipe -> loop
+  if (!iris && hx >= gateK * CW + 6) iris = { ph: "close", t: 0 };
+  if (iris) { iris.t += dt;
+    if (iris.ph === "close" && iris.t > .7) { iris = { ph: "open", t: 0 }; scroll = 0; hero.y = L.base; hero.vy = 0; hero.ground = true; lap++; bossDone = false;
+      for (const c of world) { for (const cn of c.coins) cn.got = false; if (c.mini) c.mini.alive = true; if (c.bug) c.bug.alive = true } }
+    else if (iris.ph === "open" && iris.t > .7) iris = null }
+  // bugs walking
+  for (const c of world) if (c.bug && !c.bug.alive && c.bug.dieT !== undefined) c.bug.dieT += dt;
+  // particles
+  if (Math.random() < .25 + I * .6 && parts.length < 420 && !(hero.big && !hero.ground)) parts.push({ x: L.heroSX + 2 + Math.random() * 6 + hero.dx, y: hero.y - 26 - Math.random() * 3, vx: -speed * .4 - Math.random() * 14, vy: -14 - Math.random() * 16, g: -8, life: .5 + Math.random() * .4, max: .9, col: Math.random() < .5 ? C.gold : "#ff8a26", kind: "ember" });
+  for (const r of rockets) { r.fuse -= dt; r.y += r.vy * dt; if (Math.random() < .7) parts.push({ x: r.x, y: r.y + 2, vx: 0, vy: 10, g: 0, life: .3, max: .3, col: C.gold, kind: "ember" });
+    if (r.fuse <= 0) { burst(r.x, Math.max(L.pf.y + 24, r.y), 34, [r.ramp, RAMPS.gold], 80); r.dead = 1 } }
+  rockets = rockets.filter(r => !r.dead);
+  for (const q of parts) { q.px = q.x; q.py = q.y; q.vy += q.g * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.life -= dt; if (q.kind === "puff") q.vx *= .9 }
+  parts = parts.filter(q => q.life > 0);
+  for (const f of coinFx) { f.vy += 320 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.f += dt * 12; f.life -= dt; const gy = L.base - colAt(f.x).h - 9; if (f.y > gy && f.vy > 0 && f.b < 2) { f.y = gy; f.vy *= -.45; f.vx *= .7; f.b++ } }
+  coinFx = coinFx.filter(f => f.life > 0);
+  for (const f of flyers) { f.t += dt; if (f.t >= f.dur && !f.done) { f.done = 1; bump = .1; parts.push({ x: f.tx, y: f.ty, vx: 0, vy: 0, g: 0, life: .3, max: .3, col: C.cream, kind: "star" }) } }
+  flyers = flyers.filter(f => !f.done);
+  for (const q of pops) { q.life -= dt; q.y -= dt * (q.coin ? 6 : 10) } pops = pops.filter(q => q.life > 0);
+  for (const m of MODELS) m.flash = Math.max(0, m.flash - dt);
+  if (banner) { banner.life -= dt; if (banner.life <= 0) banner = null }
+  flash = Math.max(0, flash - dt); bump = Math.max(0, bump - dt);
+  shakeA = Math.max(0, shakeA - dt * 8);
+  shk = shakeA > .3 ? [Math.round((Math.random() - .5) * 2 * shakeA), Math.round((Math.random() - .5) * 2 * shakeA)] : [0, 0];
+  for (const c of LY.clouds) c.x -= dt * c.drift;
+  if (hover && hover.touch && now - hover.t > 4) hover = null;
+}
+function updateFight(dt, now, hx, gnd) {
+  const F = fight; F.t += dt; F.fl = Math.max(0, F.fl - dt);
+  const bossW = 48, bossH = 44, hoverY = F.wy + Math.round(Math.sin(now * 3) * 2);
+  if (F.ph === "enter") { const u = clamp(F.t / 1.0, 0, 1), e = 1 - Math.pow(1 - u, 3); F.y = (L.pf.y - 60) + (hoverY - (L.pf.y - 60)) * e;
+    if (u >= 1) { F.ph = "fight"; F.t = 0; F.gnd = hero.y; shake(2) } }
+  else if (F.ph === "fight") {
+    F.y = hoverY; const cyc = .78, i = Math.floor(F.t / cyc), u = (F.t % cyc) / cyc;
+    const tx = F.wx - scroll - L.heroSX - 2, ty = F.y - 1;
+    hero.ground = false; hero.big = false;
+    hero.dx = Math.round(Math.sin(Math.PI * u) * tx * .92); hero.y = F.gnd - Math.sin(Math.PI * u) * (F.gnd - ty); hero.vy = u < .5 ? -1 : 1;
+    if (u >= .5 && F.hit <= i && i < 3) { F.hit = i + 1; F.hp = 2 - i; F.fl = .16; shake(2 + i); boom(F.wx - scroll, F.y + 4, 4); burst(F.wx - scroll, F.y + 2, 14, [RAMPS.gold], 70);
+      pops.push({ s: "HIT!", x: F.wx - scroll, y: F.y - 10, life: .7, st: sty(FP, C.cream, INK) }) }
+    if (F.t >= cyc * 3) { F.ph = "boom"; F.t = 0; hero.dx = 0; hero.y = F.gnd; hero.ground = true; hero.vy = 0; hero.cheer = 1.6 }
+  } else if (F.ph === "boom") {
+    F.y = hoverY + Math.round((Math.random() - .5) * 3);
+    if (Math.random() < dt * 22) boom(F.wx - scroll + (Math.random() - .5) * bossW * .8, F.y + Math.random() * bossH * .8, 4 + Math.floor(Math.random() * 4));
+    if (F.t > .9 && !F.blown) { F.blown = 1; shake(6); flash = .3; burst(F.wx - scroll, F.y + bossH / 2, 60, topRamps(), 130); coinRain(F.wx - scroll + scroll, F.y + bossH / 2, 18); fireworks(4);
+      banner = { s: F.b + " BILLION", sub: "BOSS CLEAR", life: 3.2, col: "gold" } }
+    if (F.t > 2.0) { fight = null; if (!F.live) bossDone = true }
+  }
+}
+
+/* =====================================================================
+   DRAW: world
+   ===================================================================== */
+function blitStrip(c, par, yb) { const off = ((Math.floor(scroll * par) % PER) + PER) % PER; for (let x = -off; x < LW; x += PER) X.drawImage(c, x, yb - c.height) }
+function drawBack(now) {
+  const c = LY.c, base = L.base;
+  X.drawImage(c.sky, 0, L.pf.y);
+  if (c.stars > .02) for (const s of LY.stars) { const tw = Math.sin(now * 1.7 + s[2] * 3); if (tw < .2 - c.stars * .7) continue;
+    X.fillStyle = tw > .8 ? WHITE : c.stars > .5 ? "#9c8cd8" : "#e0a8c8"; X.fillRect(s[0], s[1], 1, 1);
+    if (s[3] && tw > .9) { X.fillStyle = "#6b5aa8"; X.fillRect(s[0] - 1, s[1], 3, 1); X.fillRect(s[0], s[1] - 1, 1, 3); X.fillStyle = WHITE; X.fillRect(s[0], s[1], 1, 1) } }
+  const h = hourNow(); const f = c.isDay ? clamp((h - 5.8) / 13.8, 0, 1) : (((h + 24 - 19.6) % 24) / 10.2);
+  const arcTop = L.pf.y + 8, arcBot = base - L.mH * .55;
+  X.drawImage(c.sun, Math.round(LW * (.1 + .8 * f) - c.sun.width / 2), Math.round(arcBot - (arcBot - arcTop) * Math.sin(Math.PI * clamp(f, .03, .97)) - c.sun.height / 2));
+  const cloud = (near) => { for (const cl of c.clouds) { if ((cl.par > .05) !== near) continue; const w = LW + cl.c.width + 40; const x = (((cl.x - scroll * cl.par) % w) + w) % w - cl.c.width; X.drawImage(cl.c, Math.round(x), cl.y) } };
+  cloud(false);
+  blitStrip(c.far, .03, base - Math.round(L.mH * .18));
+  blitStrip(c.mtn, .07, base);
+  cloud(true);
+  blitStrip(c.city, .16, base);
+  if (c.win > .05 && D) { const off = ((Math.floor(scroll * .16) % PER) + PER) % PER, y0 = base - LY.cH, frac = .18 + .72 * D.intensity, tick = Math.floor(now * .7);
+    for (let i = 0; i < LY.wins.length; i++) { const w = LY.wins[i]; let x = w.x - off; if (x < -2) x += PER; if (x >= LW) continue;
+      if (w.beacon) { if (Math.floor(now * 1.5 + i) % 3 === 0) { X.fillStyle = C.red; X.fillRect(x, y0 + w.y, 1, 1) } continue }
+      if (w.s < frac * c.win && !(hash(i * 31 + tick) < .015)) { X.fillStyle = w.s < .07 ? C.cyan : w.s < frac * .5 ? C.gold : C.cream; X.fillRect(x, y0 + w.y, 1, 2) } } }
+  blitStrip(c.hill, .32, base);
+}
+function drawTerrain(now) {
+  const sc = Math.round(scroll), first = Math.floor(sc / CW) - 1, last = Math.floor((sc + LW) / CW) + 1, base = L.base, P = PHC;
+  // ground strip
+  patFill(LY.c.gtP, 0, base, LW, L.gH, -sc, base);
+  for (let k = first; k <= last; k++) {
+    const c = world[k], x = k * CW - sc;
+    if (!c) { X.fillStyle = INK; X.fillRect(x, base - 1, CW, 1); continue }
+    if (c.kind === "day" && c.t <= 0) { // rest day: water + rope bridge
+      X.fillStyle = P.water[0]; X.fillRect(x, base + 1, CW, L.gH - 1); X.fillStyle = P.water[1]; X.fillRect(x, base + 2, CW, 2);
+      X.fillStyle = P.water[2]; const wv = (Math.floor(now * 6) + k * 5) % 14; X.fillRect(x + (wv % CW), base + 2, 3, 1); if ((k + Math.floor(now * 2)) % 3 === 0) X.fillRect(x + 9, base + 6, 2, 1);
+      for (let i = 0; i < CW; i += 4) { X.fillStyle = RAMPS.sand[2]; X.fillRect(x + i, base - 1, 3, 1); X.fillStyle = RAMPS.sand[1]; X.fillRect(x + i, base, 3, 1); X.fillStyle = RAMPS.sand[0]; X.fillRect(x + i + 3, base - 1, 1, 2) }
+      X.fillStyle = RAMPS.sand[3]; if (k % 2 === 0) { X.fillRect(x, base - 6, 1, 5); X.fillStyle = RAMPS.sand[1]; X.fillRect(x + 1, base - 6, 1, 5) }
+      X.fillStyle = RAMPS.sand[0]; for (let i = 0; i < CW; i++) X.fillRect(x + i, base - 5 + Math.round(Math.sin((i + (k % 2) * CW) / (2 * CW) * Math.PI) * 1.5), 1, 1);
+      continue;
+    }
+    if (c.kind !== "day") { // lead / gate / post: plain grass ground
+      if (c.kind === "lead" && c.i === 1) signboard(x, base, "START");
+      if (c.kind === "gate") drawGate(x, base, now);
+      continue;
+    }
+    const top = base - c.h;
+    for (const s of c.sg) patFill(c.est ? brickPat(s.rn).e : brickPat(s.rn).m, x, base - 3 - s.y1 + 3, CW, s.y1 - s.y0, x, base);
+    const L_ = world[k - 1], R_ = world[k + 1], lh = L_ ? L_.h : 0, rh = R_ ? R_.h : 0;
+    if (lh < c.h) { X.fillStyle = "#ffffff22"; X.fillStyle = c.est ? RAMPS.grey[2] : RAMPS.grey[3]; for (let y = top + 3; y < base - lh; y += c.est ? 2 : 1) X.fillRect(x, y, 1, 1) }
+    if (rh < c.h) { X.fillStyle = INK; X.fillRect(x + CW - 1, top + 1, 1, c.h - rh - 1);
+      for (let y = base - rh; y < base - rh + 3 && R_; y++) for (let i = 0; i < 4; i++) if (((x + CW + i + y) & 1) === 0 && i < 4 - (y - (base - rh))) X.fillRect(x + CW + i, y, 1, 1) }
+    // grass cap
+    X.fillStyle = P.grass[2]; X.fillRect(x, top, CW, 1); X.fillStyle = P.grass[1]; X.fillRect(x, top + 1, CW, 1); X.fillStyle = P.grass[0]; X.fillRect(x, top + 2, CW, 1);
+    for (let i = 0; i < CW; i += 2) X.fillRect(x + i + ((k & 1)), top + 3, 1, 1);
+    X.fillStyle = P.grass[2]; for (let i = 1; i < CW; i += 5) X.fillRect(x + ((i + k * 3) % CW), top - 1, 1, 1);
+    if (c.est) { X.fillStyle = RAMPS.violet[3]; for (let i = 0; i < CW; i += 2) X.fillRect(x + i, top + 4, 1, 1) }
+    if (c.today) drawBeacon(x, top, now);
+  }
+  for (let k = first; k <= last; k++) { const c = world[k]; if (c && c.kind === "day" && c.date.getDate() === 1) monthPlaque(k * CW - sc, c) }
+  // coins over columns
+  for (let k = first; k <= last; k++) { const c = world[k]; if (!c || !c.coins.length) continue;
+    c.coins.forEach((cn, j) => { if (cn.got) return; const pp = coinPos(k, j, c.coins.length), fr = Math.floor(now * 9 + k * 2 + j) % 6;
+      let y = pp.y + Math.round(Math.sin(now * 3 + k * .7 + j) * .7);
+      if (cn.pop) { cn.popT = (cn.popT || 0) + 1 / 60; const u = clamp(cn.popT / .5, 0, 1); y -= Math.round(Math.sin(Math.PI * u) * 14); if (u >= 1) cn.pop = 0 }
+      X.drawImage(cn.m.coin.frames[fr], pp.x - sc - 1, y - 1);
+      if (hash(k * 13 + j + Math.floor(now * 3)) < .05) spark(pp.x - sc + 3, y + 2, Math.floor(now * 12) % 4) }) }
+  // guardians + bugs
+  for (let k = first; k <= last; k++) { const c = world[k]; if (!c) continue; const x = k * CW - sc;
+    if (c.mini && c.mini.alive) { const my = base - c.h - 24 + Math.round(Math.sin(now * 4 + k) * 2), fr = Math.floor(now * 8) & 1;
+      X.drawImage(MINI.n[fr], x - 2, my);
+      const st = sty(FS, C.cream, INK); TC(c.bill + "B", x + CW / 2, my - 8, st) }
+    if (c.bug) { const bx = Math.round(k * CW + 8 + Math.sin(now * 1.3 + c.bug.ph) * 3 - sc);
+      if (c.bug.alive) X.drawImage(BUG[Math.floor(now * 6) & 1], bx - 7, base - 10);
+      else if (c.bug.dieT < 1) X.drawImage(BUGDEAD, bx - 7, base - 10 + Math.round(c.bug.dieT * c.bug.dieT * 60)) } }
+}
+function monthPlaque(x, c) { const s = MON[c.date.getMonth()], st = sty(FS, RAMPS.sand[3], null, RAMPS.sand[0]), w = TW(s, st) + 5, y = L.base + 4;
+  X.fillStyle = INK; X.fillRect(x, y - 1, w + 2, FS.h + 5); X.fillStyle = RAMPS.sand[1]; X.fillRect(x + 1, y, w, FS.h + 3); X.fillStyle = RAMPS.sand[2]; X.fillRect(x + 1, y, w, 1); T(s, x + 3, y + 2, st) }
+function signboard(x, base, s) { const st = sty(FS, WHITE, null, RAMPS.green[0]), w = TW(s, st) + 8, y = base - 22;
+  X.fillStyle = RAMPS.sand[0]; X.fillRect(x + 5, y + 10, 3, 12); X.fillStyle = RAMPS.sand[2]; X.fillRect(x + 5, y + 10, 1, 12);
+  X.fillStyle = INK; X.fillRect(x - 1, y - 1, w + 2, 13); X.fillStyle = RAMPS.green[1]; X.fillRect(x, y, w, 11); X.fillStyle = RAMPS.green[2]; X.fillRect(x, y, w, 1); X.fillStyle = RAMPS.green[0]; X.fillRect(x, y + 10, w, 1);
+  T(s, x + 4, y + 3, st) }
+function drawBeacon(x, top, now) { // today's brazier: flame height follows today's intensity
+  const cx = x + CW / 2, I = D.intensity, y = top - 1;
+  X.fillStyle = INK; X.fillRect(cx - 7, y - 5, 14, 6); X.fillStyle = RAMPS.steel[2]; X.fillRect(cx - 6, y - 4, 12, 3); X.fillStyle = RAMPS.steel[3]; X.fillRect(cx - 6, y - 4, 12, 1); X.fillStyle = RAMPS.steel[1]; X.fillRect(cx - 5, y - 1, 10, 1);
+  const fh = 8 + Math.round(I * 16);
+  for (let i = -5; i <= 5; i++) { const hh = Math.max(1, Math.round(fh * (1 - Math.abs(i) / 6.5) + Math.sin(now * 14 + i * 1.7) * 2 + Math.sin(now * 23 - i) * 1.2));
+    for (let j = 0; j < hh; j++) { const fr = j / hh; X.fillStyle = fr < .3 ? FLAME[1] : fr < .55 ? FLAME[2] : fr < .82 ? FLAME[3] : FLAME[4]; X.fillRect(cx + i, y - 5 - j, 1, 1) } }
+  if (Math.random() < .3 && parts.length < 420) parts.push({ x: cx + (Math.random() - .5) * 8, y: y - 6 - fh * .6, vx: (Math.random() - .5) * 8, vy: -20 - Math.random() * 15, g: -4, life: .7, max: .7, col: Math.random() < .5 ? C.gold : "#ff8a26", kind: "ember" });
+}
+function drawGate(x, base, now) { // the warp ring that loops the run
+  const cx = x + CW / 2 + 4, cy = base - 18, rx = 9, ry = 16;
+  for (let y = -ry - 2; y <= ry + 2; y++) for (let xx = -rx - 2; xx <= rx + 2; xx++) { const d = (xx * xx) / (rx * rx) + (y * y) / (ry * ry);
+    if (d > 1.32) continue; let col;
+    if (d > 1.0) col = INK; else if (d > .72) { const a = Math.atan2(y, xx) + now * 4; col = Math.sin(a * 3) > 0 ? RAMPS.violet[3] : RAMPS.magenta[2] }
+    else { const sw = Math.sin(Math.hypot(xx, y * .6) * .9 - now * 8); col = sw > .5 ? RAMPS.teal[3] : sw > -.2 ? RAMPS.teal[2] : RAMPS.violet[1] }
+    X.fillStyle = col; X.fillRect(cx + xx, cy + y, 1, 1) }
+  X.fillStyle = RAMPS.steel[1]; X.fillRect(cx - rx - 3, base - 3, rx * 2 + 7, 3); X.fillStyle = RAMPS.steel[3]; X.fillRect(cx - rx - 3, base - 3, rx * 2 + 7, 1);
+  TC("WARP", cx, cy - ry - 10, sty(FS, C.cyan, INK));
+}
+
+/* ---------------- hero ---------------- */
+function drawHero(now) {
+  const x0 = L.heroSX + hero.dx, fy = Math.round(hero.y), I = D ? D.intensity : .5;
+  // shadow on whatever is below
+  const gy = L.base - colAt(scroll + x0).h; X.fillStyle = INK; const sw = clamp(10 - Math.round((gy - fy) / 10), 3, 10); for (let i = 0; i < sw; i++) if (hero.ground || (i + fy) & 1) X.fillRect(x0 - sw / 2 + i | 0, gy, 1, 1);
+  if (!hero.ground && hero.big && hero.vy < 80) { const k = Math.floor(hero.spin * 18) % 4; X.drawImage(HERO.ball[k], x0 - 8, fy - 20);
+    if (parts.length < 420) parts.push({ x: x0 + Math.random() * 4 - 2, y: fy - 12 + Math.random() * 6, vx: -40, vy: 0, g: -10, life: .25, max: .25, col: FLAME[2 + (Math.random() * 3 | 0)], kind: "ember" }); return }
+  let fr, moving = speed > 4;
+  if (hero.cheer > 0 && hero.ground) fr = HERO.cheer;
+  else if (!hero.ground) fr = hero.vy < 0 ? HERO.jump : HERO.fall;
+  else if (hero.land > 0) fr = HERO.land;
+  else if (moving) fr = HERO.run[Math.floor(hero.ft) % 6];
+  else { fr = HERO.idle[Math.floor(now * 2) % 2]; if ((now % 3.1) < .13) fr = HERO.blink }
+  const y = fy - 26 - (hero.cheer > 0 && hero.ground ? Math.round(Math.abs(Math.sin(hero.cheer * 9)) * 3) : 0), bob = fr.bob, sx = x0 - 11;
+  // scarf tail streaming behind
+  const lean = moving || !hero.ground ? 1 : .2;
+  for (let i = 1; i <= 6; i++) { const ty = y + 15 + bob + Math.round(Math.sin(now * 15 - i * .9) * Math.min(1.6, i * .3) * lean) + (lean < .5 ? Math.floor(i / 2) : 0);
+    X.fillStyle = INK; X.fillRect(sx + 8 - i, ty - 1, 1, 3); X.fillStyle = i & 1 ? HC.C : HC.c; X.fillRect(sx + 8 - i, ty, 1, 1) }
+  // living flame hair (taller on busy days, leaning back with speed)
+  const lb = moving || !hero.ground ? .35 + I * .25 : .06, hx = sx + 5, hy = y + 4 + bob;
+  for (let pass = 0; pass < 2; pass++) for (let i = 0; i < 13; i++) {
+    const dome = 2 + 3.6 * Math.sin(Math.PI * (i + .5) / 13) + (i < 4 ? 1 : 0), n = Math.sin(now * 13 + i * 1.9) + Math.sin(now * 21 - i * 1.3) * .6;
+    const hh = Math.max(1, Math.round(dome * (.7 + I * .5) + n * 1.2));
+    for (let j = 0; j < hh; j++) { const xx = hx + i - Math.round(j * lb), yy = hy - j;
+      if (pass === 0) { X.fillStyle = INK; X.fillRect(xx - 1, yy - 1, 3, 2) }
+      else { const f2 = j / hh; X.fillStyle = f2 < .34 ? FLAME[1] : f2 < .62 ? FLAME[2] : f2 < .86 ? FLAME[3] : FLAME[4]; X.fillRect(xx, yy, 1, 1) } }
+  }
+  X.drawImage(fr.c, sx, y);
+}
+
+/* ---------------- boss ---------------- */
+function drawFight(now) {
+  const F = fight; if (!F || (F.ph === "boom" && F.t > .9)) return;
+  const bx = Math.round(F.wx - scroll - 24), by = Math.round(F.y), fr = Math.floor(now * 10) & 1;
+  X.drawImage(F.fl > 0 && Math.floor(now * 30) & 1 ? BOSS.f : BOSS.n[fr], bx, by);
+  // chimney + thruster flames
+  for (let i = -3; i <= 3; i++) { const hh = Math.max(1, Math.round(6 - Math.abs(i) + Math.sin(now * 17 + i * 2) * 2)); for (let j = 0; j < hh; j++) { X.fillStyle = FLAME[Math.min(4, 1 + Math.floor(j / hh * 4))]; X.fillRect(bx + 24 + i, by + 3 - j, 1, 1) } }
+  for (const nx of [Math.round(48 * .3) + 3, Math.round(48 * .62) + 3]) { const hh = 3 + (Math.floor(now * 20 + nx) % 3); for (let j = 0; j < hh; j++) { X.fillStyle = FLAME[4 - Math.min(3, j)]; X.fillRect(bx + nx - 1, by + 43 + j, 2, 1) } }
+  // boss HP
+  const st = sty(FS, C.red, INK), y = L.pf.y + 4, w = 3 * 14; T("BOSS", 6, y, st); const x = 8 + TW("BOSS", st);
+  X.fillStyle = INK; X.fillRect(x, y - 1, w + 2, FS.h + 2);
+  for (let i = 0; i < 3; i++) { X.fillStyle = i < F.hp ? RAMPS.red[2] : RAMPS.red[0]; X.fillRect(x + 1 + i * 14, y, 13, FS.h); if (i < F.hp) { X.fillStyle = RAMPS.red[3]; X.fillRect(x + 1 + i * 14, y, 13, 1) } }
+}
+
+/* ---------------- fx ---------------- */
+function drawFx(now) {
+  for (const q of parts) {
+    const a = q.life / q.max;
+    if (q.kind === "puff") { const r = a > .66 ? 0 : a > .33 ? 1 : 2; X.fillStyle = q.col; if (r === 0) X.fillRect(q.x | 0, q.y | 0, 2, 2); else if (r === 1) { X.fillRect((q.x | 0) - 1, q.y | 0, 3, 1); X.fillRect(q.x | 0, (q.y | 0) - 1, 1, 3) } else if ((q.x | 0) & 1) X.fillRect(q.x | 0, q.y | 0, 1, 1) }
+    else if (q.kind === "fw") { X.fillStyle = a > .5 ? q.col : q.col2; X.fillRect(q.x | 0, q.y | 0, 1, 1); if (a > .4) X.fillRect(q.px | 0, q.py | 0, 1, 1) }
+    else if (q.kind === "star") spark(q.x | 0, q.y | 0, a > .66 ? 1 : a > .33 ? 2 : 3);
+    else if (q.kind === "boom") { const u = 1 - a, r = Math.max(1, Math.round(q.r * (.4 + u))); const cx = q.x | 0, cy = q.y | 0;
+      if (u < .35) disc(cx, cy, r, u < .15 ? WHITE : C.cream); else if (u < .7) { disc(cx, cy, r, FLAME[2]); disc(cx, cy, Math.max(0, r - 2), FLAME[3]) } else { disc(cx, cy, r, FLAME[1]); disc(cx, cy, Math.max(0, r - 1), INK3) } }
+    else { if (q.kind === "ember" && a < .3 && ((q.x | 0) & 1)) continue; X.fillStyle = q.col; X.fillRect(q.x | 0, q.y | 0, 1, 1) }
+  }
+  for (const f of coinFx) { if (f.life < .4 && Math.floor(f.life * 20) & 1) continue; X.drawImage(coinSet(f.rn).frames[Math.floor(f.f) % 6], Math.round(f.x - scroll - 5), Math.round(f.y)) }
+  for (const r of rockets) { X.fillStyle = WHITE; X.fillRect(r.x | 0, r.y | 0, 1, 2) }
+  for (const q of pops) { if (q.life < .3 && Math.floor(q.life * 20) & 1) continue; TC(q.s, q.x, Math.round(q.y), q.st) }
+}
+function drawFlyers(now) {
+  for (const f of flyers) { if (f.t < 0) continue; const k = clamp(f.t / f.dur, 0, 1), e = k * k, mx = (f.x + f.tx) / 2, my = Math.min(f.y, f.ty) - 30;
+    const x = (1 - e) * (1 - e) * f.x + 2 * (1 - e) * e * mx + e * e * f.tx, y = (1 - e) * (1 - e) * f.y + 2 * (1 - e) * e * my + e * e * f.ty;
+    X.drawImage(coinSet(f.rn).frames[Math.floor(now * 14 + f.x) % 6], Math.round(x - 5), Math.round(y - 5)) }
+}
+function drawBanner(now) {
+  if (!banner) return; const b = banner; if (b.life < .45 && Math.floor(b.life * 16) % 2) return; if (b.blink && Math.floor(now * 6) % 2) return;
+  const fill = b.col === "red" ? [RAMPS.pink[3], RAMPS.pink[3], RAMPS.red[3], RAMPS.red[2], RAMPS.red[2], RAMPS.red[1]] : GOLD;
+  const st = sty(FB, fill, INK, b.col === "red" ? RAMPS.red[0] : "#5a1020"), sub = sty(FP, WHITE, INK);
+  const w = Math.max(TW(b.s, st), TW(b.sub || "", sub)) + 24, h = FB.h + (b.sub ? 14 : 0) + 10, y = L.pf.y + Math.round(L.pf.h * .2);
+  const total = b.total || (b.total = b.life), grow = clamp((total - b.life) / .18, 0, 1), ww = Math.round(w * (1 - Math.pow(1 - grow, 3))), x0 = Math.round(LW / 2 - ww / 2);
+  const r = b.col === "red" ? RAMPS.red : RAMPS.violet;
+  X.fillStyle = INK; X.fillRect(x0 - 1, y - 1, ww + 2, h + 2);
+  X.fillStyle = r[1]; X.fillRect(x0, y, ww, h); X.fillStyle = r[0]; for (let yy = y + 2; yy < y + h - 2; yy++) for (let xx = x0 + ((yy & 1)); xx < x0 + ww; xx += 2) X.fillRect(xx, yy, 1, 1);
+  X.fillStyle = C.gold; X.fillRect(x0, y + 1, ww, 1); X.fillRect(x0, y + h - 2, ww, 1);
+  if (grow >= 1) { TC(b.s, LW / 2, y + 5, st); if (b.sub) TC(b.sub, LW / 2, y + 7 + FB.h, sub) }
+}
+function drawIris() {
+  if (!iris) return; const u = clamp(iris.t / .7, 0, 1), k = iris.ph === "close" ? 1 - u * u : u * u;
+  const cx = L.heroSX + hero.dx, cy = Math.round(hero.y) - 13, R = Math.round(k * Math.hypot(LW, L.pf.h) * .75);
+  X.fillStyle = INK;
+  for (let y = L.pf.y; y < L.pf.y + L.pf.h; y++) { const dy = y - cy, hw = R * R - dy * dy > 0 ? Math.floor(Math.sqrt(R * R - dy * dy)) : -1;
+    if (hw < 0) X.fillRect(0, y, LW, 1); else { X.fillRect(0, y, Math.max(0, cx - hw), 1); X.fillRect(cx + hw + 1, y, Math.max(0, LW - cx - hw - 1), 1) } }
+}
+function drawTitle(now) { // intro card while the score tallies
+  const t = introT, out = clamp((t - 3.4) / .5, 0, 1); if (out >= 1) return;
+  const st = sty(FB, FLAMEG, INK, "#3d0a18"), y0 = L.pf.y + Math.round(L.pf.h * .14) - Math.round(out * out * (L.pf.h * .6));
+  const lines = TW("TOKEN BURN", st) <= LW - 16 ? ["TOKEN BURN"] : ["TOKEN", "BURN"];
+  lines.forEach((s, i) => { const w = TW(s, st), x = Math.round((LW - w) / 2), drop = t < .9 ? Math.round(-50 * Math.pow(1 - t / .9, 2) * Math.abs(Math.cos(t * 9))) : 0, y = y0 + i * (FB.h + 6) + drop;
+    for (let k = 0; k < w; k++) { const hh = Math.round(3 + 2.5 * Math.sin(now * 9 + k * .55) + 1.5 * Math.sin(now * 5.3 - k * .23)); for (let j = 0; j < hh; j++) { X.fillStyle = FLAME[Math.min(4, 1 + Math.floor(j / hh * 4))]; X.fillRect(x + k, y - 2 - j, 1, 1) } }
+    T(s, x, y, st) });
+  const y2 = y0 + lines.length * (FB.h + 6) + 3;
+  if (t > .8 && D) TC((D.total / 1e9).toFixed(2) + " BILLION TOKEN QUEST", LW / 2, y2, sty(FS, C.cyan, INK));
+  if (t > 1.2 && Math.floor(now * 2.4) % 2) TC("PRESS START", LW / 2, y2 + 11, sty(FP, C.cream, INK));
+}
+
+/* =====================================================================
+   DRAW: HUD
+   ===================================================================== */
+function bevelBar(y0, h, top) { // dark HUD band with a bevelled metal edge
+  X.fillStyle = INK2; X.fillRect(0, y0, LW, h);
+  X.fillStyle = INK; for (let y = y0; y < y0 + h; y += 2) for (let x = (y >> 1) & 1; x < LW; x += 4) X.fillRect(x, y, 1, 1);
+  if (top) { X.fillStyle = INK; X.fillRect(0, y0 + h - 3, LW, 1); X.fillStyle = INK4; X.fillRect(0, y0 + h - 2, LW, 1); X.fillStyle = RAMPS.violet[1]; X.fillRect(0, y0 + h - 1, LW, 1) }
+  else { X.fillStyle = RAMPS.violet[1]; X.fillRect(0, y0, LW, 1); X.fillStyle = INK4; X.fillRect(0, y0 + 1, LW, 1); X.fillStyle = INK; X.fillRect(0, y0 + 2, LW, 1) }
+}
+function bigScore(cx, y) {
+  const st = sty(FB, GOLD, INK, "#5a1020"), s = TB.full(shown), w = TW(s, st); let x = Math.round(cx - w / 2); const pad = s.padStart(16);
+  for (let i = 0; i < s.length; i++) { const ch = s[i], g = gcv(ch, st), bi = 16 - s.length + i; X.drawImage(g.c, x - g.pad, y - g.pad - (digitBump[bi] > 0 ? 1 : 0) - (bump > 0 ? 1 : 0)); x += g.adv }
+  return w;
+}
+function drawTopHud(now) {
+  const W = LW, blink = Math.floor(now * 2) % 2 === 0;
+  bevelBar(0, L.hudH, true);
+  const red = sty(FP, C.red), redD = sty(FP, C.redD), lab = sty(FS, C.lab), labC = sty(FS, C.cyanD), val = sty(FP, C.cream), valW = sty(FP, WHITE);
+  if (!D) { TC("HI-SCORE", W / 2, 4, red); TC("- - - - -", W / 2, 19, sty(FB, [INK4, INK4, INK3], INK)); return }
+  const nextH = (Math.floor(D.total / 1e8) + 1) * 1e8, toNext = nextH - D.total, nextLab = (nextH % 1e9 === 0 ? nextH / 1e9 + "B" : (nextH / 1e9).toFixed(1) + "B");
+  if (L.wide) {
+    T("1UP", 6, 5, blink ? red : redD); T("TODAY", 32, 5, labC);
+    T(TB.full(D.today), 6, 16, val);
+    const ci = MODELS[0] ? MODELS[0].coin.mini : null; if (ci) X.drawImage(coinSet("gold").mini, 6, 27); T("x" + String(credits % 10000).padStart(4, "0"), 15, 28, sty(FS, C.cream));
+    TC("HI-SCORE", W / 2, 4, red);
+    bigScore(W / 2, 15);
+    const rx = W - 6, wk = TB.full(D.week), side = (W - 186) / 2 - 8;
+    TR("WEEK", rx, 5, labC);
+    TR(TW(wk, valW) <= side ? wk : short(D.week), rx, 16, valW);
+    const nl = "NEXT " + nextLab + " IN " + short(toNext); TR(nl, rx, 28, lab);
+  } else {
+    TC("HI-SCORE", W / 2, 4, red);
+    bigScore(W / 2, 15);
+    T("TODAY", 6, 38, labC); TR(short(D.week), W - 6, 38, valW); TR("WEEK", W - 6 - TW(short(D.week), valW) - 4, 38, labC);
+    T(TB.full(D.today), 6, 47, val);
+    TR("NEXT " + nextLab + " IN " + short(toNext), W - 6, 48, lab);
+  }
+}
+function drawBotHud(now) {
+  const y0 = LH - L.botH, W = LW;
+  bevelBar(y0, L.botH, false);
+  if (!D) return;
+  const lab = sty(FS, C.lab), labW = sty(FS, "#d0d7e2"), head = sty(FS, C.cream), n = world.length;
+  const days = world.filter(c => c.kind === "day"), nd = days.length, dk0 = NLEAD;
+  let lx, lw, iy, ix, iw, cols, rowH, mmY, mmH, barY;
+  if (L.wide) { lx = 6; lw = Math.round(W * .46); mmY = y0 + 15; mmH = 17; barY = y0 + 44; ix = lx + lw + 10; iw = W - 6 - ix; iy = y0 + 6; cols = 2; rowH = 9 }
+  else { lx = 6; lw = W - 12; mmY = y0 + 15; mmH = 22; barY = y0 + 51; ix = 6; iw = W - 12; iy = y0 + 76; cols = 1; rowH = 10 }
+  // history minimap: one bar per day (model-coloured, estimated days dithered)
+  T("HISTORY", lx, y0 + 6, head); TR(dateLabel(D.firstDay) + " - " + dateLabel(D.todayISO), lx + lw, y0 + 6, lab);
+  X.fillStyle = INK; X.fillRect(lx, mmY - 1, lw, mmH + 2); X.fillStyle = INK3; X.fillRect(lx, mmY + mmH, lw, 1);
+  const bw = lw / nd; L.mm = { x: lx, y: mmY, w: lw, h: mmH, bw, nd };
+  const hk = clamp(Math.floor((scroll + L.heroSX) / CW) - dk0, -1, nd);
+  for (let i = 0; i < nd; i++) { const c = days[i], x0 = lx + Math.floor(i * bw), x1 = lx + Math.floor((i + 1) * bw), ww = Math.max(1, x1 - x0 - (bw >= 3 ? 1 : 0));
+    if (c.date.getDate() === 1) { X.fillStyle = INK4; X.fillRect(x0, mmY + mmH + 1, 1, 2); T(MON[c.date.getMonth()], x0 + 2, mmY + mmH + 3, lab) }
+    if (!c.t) { X.fillStyle = INK3; X.fillRect(x0, mmY + mmH - 1, ww, 1); continue }
+    const hh = Math.max(2, Math.round(Math.sqrt(c.t / D.maxDay) * mmH)); let acc = 0;
+    for (const s of c.segs) { const a0 = Math.round(hh * acc / c.t); acc += s.v; const a1 = Math.round(hh * acc / c.t); if (a1 <= a0) continue;
+      const r = s.m.ramp; for (let y = mmY + mmH - a1; y < mmY + mmH - a0; y++) for (let x = x0; x < x0 + ww; x++) { X.fillStyle = c.est ? (((x + y) & 1) ? r[1] : r[2]) : (y === mmY + mmH - hh ? r[3] : r[2]); X.fillRect(x, y, 1, 1) } }
+  }
+  if (hk >= 0 && hk < nd) { const x = lx + Math.floor((hk + .5) * bw); X.fillStyle = FLAME[1 + Math.floor(now * 10) % 3]; X.fillRect(x - 1, mmY - 4, 3, 2); X.fillStyle = C.cream; X.fillRect(x, mmY - 2, 1, mmH + 2) }
+  // measured vs estimated
+  const f = D.total ? D.measured / D.total : 1, mL = (L.wide ? "MEASURED " : "MEAS ") + short(D.measured), eL = (L.wide ? "ESTIMATED " : "EST ") + short(D.estimated);
+  const ms = sty(FS, RAMPS.orange[3]), es = sty(FS, C.violet);
+  let bx, bwid, by;
+  T(mL, lx, barY, ms); TR(eL, lx + lw, barY, es); bx = lx; bwid = lw; by = barY + FS.h + 3;
+  const mw = Math.round(bwid * f), bh = 7;
+  X.fillStyle = INK; X.fillRect(bx - 1, by - 1, bwid + 2, bh + 2);
+  patFill(brickPat("orange").m, bx, by, mw, bh, bx, by); patFill(brickPat("violet").e, bx + mw, by, bwid - mw, bh, bx, by);
+  X.fillStyle = WHITE; X.fillRect(bx + mw, by - 2, 1, bh + 4);
+  const pct = Math.round(f * 100) + "%", pe = Math.round((1 - f) * 100) + "%", ps = sty(FS, WHITE, INK);
+  if (mw > TW(pct, ps) + 6) T(pct, bx + 3, by + 1, ps); if (bwid - mw > TW(pe, ps) + 6) TR(pe, bx + bwid - 3, by + 1, ps);
+  // inventory: one slot per model (coin, name, tokens, share underline)
+  T("INVENTORY", ix, iy, head); TR("1 COIN = " + short(CHUNK), ix + iw, iy, lab);
+  const list = MODELS.slice(0, cols === 2 ? 10 : 10), colW = Math.floor((iw - (cols - 1) * 8) / cols);
+  L.inv = { x: ix, y: iy + 9, cols, rowH, colW, n: list.length };
+  list.forEach((m, i) => { const col = cols === 2 ? Math.floor(i / 5) : 0, row = cols === 2 ? i % 5 : i, x = ix + col * (colW + 8), y = iy + 10 + row * rowH;
+    if (m.flash > 0) { X.fillStyle = m.ramp[0]; X.fillRect(x - 1, y - 2, colW + 2, rowH) }
+    X.drawImage(m.coin.mini, x, y - 1);
+    const nm = m.name.toUpperCase(), ns = sty(FS, m.ramp[3]), vs = sty(FS, i === 0 ? C.cream : "#d0d7e2");
+    const vt = cols === 1 ? TB.full(m.tokens) : short(m.tokens);
+    let name = nm; while (name.length > 3 && TW(name, ns) > colW - 12 - TW(vt, vs) - 4) name = name.slice(0, -1);
+    T(name, x + 9, y, ns); TR(vt, x + colW, y, vs);
+    const sw = Math.max(1, Math.round((colW - 9) * Math.sqrt(m.share))); X.fillStyle = m.ramp[1]; X.fillRect(x + 9, y + FS.h + 1, sw, 1) });
+  // CRT chip in the corner of the history header
+  const cs = sty(FS, crt ? C.mint : C.lab), cw = TW("CRT", cs) + 6;
+  const cbx = L.wide ? lx + TW("HISTORY", head) + 6 : lx + TW("HISTORY", head) + 6, cby = y0 + 4;
+  X.fillStyle = crt ? RAMPS.green[0] : INK; X.fillRect(cbx, cby, cw, FS.h + 4); X.fillStyle = crt ? RAMPS.green[1] : INK4; X.fillRect(cbx, cby, cw, 1);
+  T("CRT", cbx + 3, cby + 2, cs); L.crtBtn = { x: cbx, y: cby, w: cw, h: FS.h + 4 };
+}
+function tipBox(lines, px, py) {
+  const w = Math.max(...lines.map(l => (l.icon ? 9 : 0) + TW(l.s, l.st))) + 10, h = lines.length * 10 + 6;
+  let x = Math.round(px + 8), y = Math.round(py - h - 6); if (x + w > LW - 2) x = Math.round(px - w - 8); if (x < 2) x = 2; if (y < 2) y = Math.round(py + 10); if (y + h > LH - 2) y = LH - 2 - h;
+  X.fillStyle = INK; X.fillRect(x - 1, y - 1, w + 2, h + 2); X.fillStyle = INK2; X.fillRect(x, y, w, h); X.fillStyle = INK4; X.fillRect(x, y, w, 1); X.fillStyle = C.gold; X.fillRect(x, y, 3, 1);
+  lines.forEach((l, i) => { let tx = x + 5; if (l.icon) { X.drawImage(l.icon, tx, y + 4 + i * 10 - 1); tx += 9 } T(l.s, tx, y + 4 + i * 10, l.st) });
+}
+function dayTip(c, px, py) {
+  if (!c || c.kind !== "day") return;
+  const lines = [{ s: dateLabel(c.d) + (c.today ? " TODAY" : ""), st: sty(FP, C.cyan) }];
+  if (c.t) { lines.push({ s: TB.full(c.t), st: sty(FP, C.cream) });
+    if (c.top) lines.push({ s: "TOP " + c.top.name.toUpperCase() + " " + Math.round(c.segs[0].v / c.t * 100) + "%", st: sty(FS, c.top.ramp[3]), icon: c.top.coin.mini });
+    if (c.segs.length > 1) lines.push({ s: c.segs.length + " MODELS", st: sty(FS, C.lab) });
+    lines.push(c.est ? { s: "ESTIMATED " + short(c.estV), st: sty(FS, C.violet) } : { s: "MEASURED", st: sty(FS, RAMPS.orange[3]) });
+    if (c.bill) lines.push({ s: "CROSSED " + c.bill + " BILLION", st: sty(FS, C.gold) });
+  } else lines.push({ s: "REST DAY", st: sty(FS, C.lab) });
+  tipBox(lines, px, py);
+}
+function drawTooltip() {
+  if (!hover || !D) return; const { x, y } = hover;
+  if (L.mm && x >= L.mm.x && x < L.mm.x + L.mm.w && y >= L.mm.y - 4 && y < L.mm.y + L.mm.h + 8) { const i = clamp(Math.floor((x - L.mm.x) / L.mm.bw), 0, L.mm.nd - 1); dayTip(world[NLEAD + i], x, L.mm.y - 2);
+    X.fillStyle = WHITE; const bx = L.mm.x + Math.floor(i * L.mm.bw); X.fillRect(bx, L.mm.y + L.mm.h + 1, Math.max(1, Math.floor(L.mm.bw)), 1); return }
+  if (L.inv && x >= L.inv.x && y >= L.inv.y && y < L.inv.y + (L.inv.cols === 2 ? 5 : L.inv.n) * L.inv.rowH + 2) {
+    const col = L.inv.cols === 2 ? clamp(Math.floor((x - L.inv.x) / (L.inv.colW + 8)), 0, 1) : 0, row = Math.floor((y - L.inv.y) / L.inv.rowH), i = L.inv.cols === 2 ? col * 5 + row : row, m = MODELS[i];
+    if (m) { const pct = m.share * 100, ps = pct >= 1 ? Math.round(pct) + "%" : pct >= .1 ? pct.toFixed(1) + "%" : "<0.1%";
+      tipBox([{ s: m.name.toUpperCase(), st: sty(FP, m.ramp[3]), icon: m.coin.mini }, { s: TB.full(m.tokens), st: sty(FP, C.cream) }, { s: "SHARE " + ps + "  RANK " + (i + 1), st: sty(FS, "#d0d7e2") },
+        { s: m.days + " DAYS ACTIVE", st: sty(FS, C.lab) }, { s: "BEST " + (m.bestD ? dateLabel(m.bestD) + " " + short(m.best) : "-"), st: sty(FS, C.gold) }, { s: "WEEK " + short(m.week), st: sty(FS, C.cyan) }], x, y) }
+    return }
+  if (y >= L.pf.y && y < L.pf.y + L.pf.h) { const k = Math.floor((x + Math.round(scroll)) / CW), c = world[k]; if (c && c.kind === "day") {
+    const cx = k * CW - Math.round(scroll); X.fillStyle = WHITE; for (let yy = L.base - c.h - 1; yy < L.base; yy += 2) { X.fillRect(cx - 1, yy, 1, 1); X.fillRect(cx + CW, yy, 1, 1) }
+    dayTip(c, x, Math.min(y, L.base - c.h)) } }
+}
+
+/* =====================================================================
+   FRAME
+   ===================================================================== */
+const PT = {}; const pt = (k, t0) => { PT[k] = (PT[k] || 0) * .95 + (performance.now() - t0) * .05 };
+function draw(now) {
+  if (!LY || !LY.c) return; let t0 = performance.now();
+  X.save(); X.beginPath(); X.rect(0, L.pf.y, LW, L.pf.h); X.clip();
+  X.translate(shk[0], shk[1]);
+  drawBack(now); pt('back', t0); t0 = performance.now();
+  if (D && HERO) {
+    drawTerrain(now); pt('terr', t0); t0 = performance.now();
+    drawFight(now);
+    drawHero(now);
+    drawFx(now);
+    blitStrip(LY.c.fg, 1.3, L.pf.y + L.pf.h);
+    drawTitle(now);
+    drawBanner(now);
+  } else drawLoading(now);
+  X.restore();
+  X.save(); X.beginPath(); X.rect(0, L.pf.y, LW, L.pf.h); X.clip(); drawIris(); X.restore();
+  t0 = performance.now(); if (fontsReady) { drawTopHud(now); pt('top', t0); t0 = performance.now(); drawBotHud(now); pt('bot', t0) } else { bevelBar(0, L.hudH, true); bevelBar(LH - L.botH, L.botH, false) }
+  if (D) drawFlyers(now);
+  if (fontsReady) drawTooltip();
+  if (flash > 0 && !RM) { X.fillStyle = flash > .12 ? WHITE : C.cream; X.globalAlpha = Math.min(.55, flash * 2); X.fillRect(0, L.pf.y, LW, L.pf.h); X.globalAlpha = 1 }
+}
+function drawLoading(now) {
+  // ground + an idle hero + spinning coin; no numbers until data arrives
+  patFill(LY.c.gtP, 0, L.base, LW, L.gH, 0, L.base);
+  if (HERO) { const fr = HERO.idle[Math.floor(now * 2) % 2]; X.drawImage(fr.c, L.heroSX - 11, L.base - 26) }
+  const cs = coinSet("gold"); X.drawImage(cs.frames[Math.floor(now * 10) % 6], L.heroSX + 14, L.base - 40 + Math.round(Math.sin(now * 4) * 2));
+  if (fontsReady) { const dots = ".".repeat(Math.floor(now * 3) % 4); T("NOW LOADING" + dots, Math.round(LW / 2 - TW("NOW LOADING...", sty(FP, C.cream, INK)) / 2), L.pf.y + Math.round(L.pf.h * .35), sty(FP, C.cream, INK)) }
+}
+function present() {
+  SCX.imageSmoothingEnabled = false;
+  SCX.fillStyle = "#07050b"; SCX.fillRect(0, 0, screen.width, screen.height);
+  SCX.drawImage(src, 0, 0, LW, LH, OX, OY, LW * S, LH * S);
+  if (crt && scanC) {
+    SCX.drawImage(scanC, OX, OY);
+    // bloom: bright-pass at 1/4 res, added on top with bilinear upscale (the art grid underneath stays untouched)
+    if ((bloomTick++ & 1) === 0) { const bx = bloomS.getContext("2d"), w = bloomS.width, h = bloomS.height; bx.imageSmoothingEnabled = true; bx.drawImage(src, 0, 0, w, h);
+      const im = bx.getImageData(0, 0, w, h), d = im.data;
+      for (let i = 0; i < d.length; i += 4) { const l = Math.max(d[i], d[i + 1], d[i + 2]), v = l > 150 ? ((l - 150) / 105) ** 2 : 0; d[i] *= v; d[i + 1] *= v; d[i + 2] *= v }
+      bx.putImageData(im, 0, 0) }
+    SCX.save(); SCX.globalCompositeOperation = "lighter"; SCX.globalAlpha = .32; SCX.imageSmoothingEnabled = true; SCX.drawImage(bloomS, OX - S, OY - S, LW * S + 2 * S, LH * S + 2 * S); SCX.restore();
+  }
+}
+
+/* ---------------- debug sprite sheet (?sheet=1) ---------------- */
+function drawSheet() {
+  X.fillStyle = "#5590f0"; X.fillRect(0, 0, LW, LH);
+  let x = 4; const fr = [...HERO.idle, HERO.blink, ...HERO.run, HERO.jump, HERO.fall, HERO.land, HERO.cheer];
+  fr.forEach(f => { X.drawImage(f.c, x, 4); x += 24 });
+  x = 4; HERO.ball.forEach(b => { X.drawImage(b, x, 36); x += 18 });
+  coinSet("gold").frames.forEach(c => { X.drawImage(c, x, 38); x += 12 });
+  coinSet("violet").frames.forEach(c => { X.drawImage(c, x, 38); x += 12 });
+  BUG.forEach(b => { X.drawImage(b, x, 38); x += 16 }); X.drawImage(BUGDEAD, x, 38); x += 16;
+  X.drawImage(BOSS.n[0], 4, 56); X.drawImage(BOSS.n[1], 56, 56); X.drawImage(BOSS.f, 108, 56); X.drawImage(MINI.n[0], 160, 60); X.drawImage(MINI.n[1], 184, 60);
+  let y = 104; for (const rn of ["orange", "violet", "teal", "pink"]) { const p = brickPat(rn); X.drawImage(p.mc, 4, y); X.drawImage(p.mc, 20, y); X.drawImage(p.ec, 40, y); X.drawImage(p.ec, 48, y); X.drawImage(coinSet(rn).mini, 60, y); y += 10 }
+  if (fontsReady) { T("HI-SCORE 0123456789", 80, 104, sty(FP, C.red)); T("SILKSCREEN LABEL 1.65B", 80, 114, sty(FS, C.lab)); T("8,160,839,326", 80, 124, sty(FB, GOLD, INK, "#5a1020")) }
+}
+
+/* =====================================================================
+   INPUT + BOOT
+   ===================================================================== */
+const toArt = e => ({ x: Math.floor((e.clientX * DPR - OX) / S), y: Math.floor((e.clientY * DPR - OY) / S) });
+screen.addEventListener("pointermove", e => { if (e.pointerType === "mouse") { const p = toArt(e); hover = { x: p.x, y: p.y, t: performance.now() / 1000 } } });
+screen.addEventListener("pointerleave", () => { hover = null });
+screen.addEventListener("pointerdown", e => {
+  const p = toArt(e);
+  if (L.crtBtn && p.x >= L.crtBtn.x - 2 && p.x < L.crtBtn.x + L.crtBtn.w + 2 && p.y >= L.crtBtn.y - 2 && p.y < L.crtBtn.y + L.crtBtn.h + 2) { toggleCrt(); return }
+  if (L.mm && p.x >= L.mm.x && p.x < L.mm.x + L.mm.w && p.y >= L.mm.y - 4 && p.y < L.mm.y + L.mm.h + 2 && e.pointerType === "mouse") { warpTo = NLEAD + clamp(Math.floor((p.x - L.mm.x) / L.mm.bw), 0, L.mm.nd - 1); return }
+  if (e.pointerType !== "mouse") { hover = { x: p.x, y: p.y, t: performance.now() / 1000, touch: true }; return }
+  if (p.y >= L.pf.y && p.y < L.pf.y + L.pf.h) jump();
+});
+function jump() { if (hero.ground && !fight && D) { hero.vy = -Math.sqrt(2 * 900 * 44); hero.ground = false; hero.big = false; puff(L.heroSX, hero.y, 4, [RAMPS.grey[3], RAMPS.grey[2]]) } }
+function toggleCrt() { crt = !crt; store.set("tb-arcade-crt", crt ? "1" : "0") }
+addEventListener("keydown", e => {
+  if (e.key === "c" || e.key === "C") toggleCrt();
+  else if (e.key === " " || e.key === "ArrowUp") { jump(); e.preventDefault() }
+  else if (e.key === "ArrowRight") fastF = .4;
+});
+addEventListener("resize", resize);
+buildHero(); buildBug(); buildFurnaces();
+resize();
+loadFonts().then(() => { if (D) layout() });
+TB.onData(d => { const h = +SP.get("hold") || 0; if (h && !D) setTimeout(() => onData(d), h); else onData(d) });
+setInterval(() => recolor(false), 30000);
+if (SP.has("boss")) setTimeout(() => { if (D) startFight(Math.max(1, Math.floor(D.total / 1e9)), true) }, +SP.get("boss") || 4500);
+if (SP.has("fanfare")) setTimeout(() => { if (D) fanfare(Math.floor(D.total / 1e8)) }, +SP.get("fanfare") || 4500);
+if (SP.has("at")) { const at = +SP.get("at"); const w = () => { if (D) warpTo = NLEAD + clamp(at, 0, todayK - NLEAD); else setTimeout(w, 200) }; setTimeout(w, 300) }
+if (DBG) window.__tb = { get hero() { return hero }, get world() { return world }, get fight() { return fight }, startFight, fanfare, onData };
+let last = performance.now() / 1000;
+function frame() {
+  requestAnimationFrame(frame);
+  const now = performance.now() / 1000;
+  if (document.hidden) { last = now; return }
+  const dt = Math.min(.05, now - last); last = now;
+  if (SP.has("sheet")) { drawSheet(); present(); return }
+  if (SP.has("cycle")) { const h = (now * 1.5) % 24; SP.set("hour", h.toFixed(2)); recolor(false) }
+  const a0 = performance.now(); const SK = SP.get('skip') || ''; update(RM ? dt * .7 : dt, now); pt('upd', a0); if (!SK.includes('d')) draw(now); const a1 = performance.now(); if (!SK.includes('p')) present(); pt('pres', a1);
+  if (DBG) { const st = window.__perf || (window.__perf = { n: 0, cpu: 0, t0: now }); st.n++; st.cpu += performance.now() - a0; st.fps = st.n / (now - st.t0); document.title = 'fps ' + st.fps.toFixed(1) + ' cpu ' + (st.cpu / st.n).toFixed(2) + ' ' + Object.entries(PT).map(([k, v]) => k + ':' + v.toFixed(2)).join(' ') }
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

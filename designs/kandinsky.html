@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Composition in Tokens</title>
+<meta name="description" content="A Kandinsky-style abstract Composition on warm paper: each model is a ringed circle sized by its share, the days beat a rhythm of marks along a diagonal, and today's intensity sets how hard the shapes float and spin.">
+<style>
+:root{--paper:#efe4cb;--ink:#1b1a1e;--red:#c7372b;--blue:#22306f;--yellow:#e8bf2e}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper)}
+body{color:var(--ink);font-family:"Futura","Century Gothic","Avenir Next","Gill Sans","Liberation Sans",Helvetica,Arial,sans-serif;overflow-x:hidden}
+#stage{position:relative;width:100%;overflow:hidden}
+canvas{position:absolute;left:0;top:0;display:block}
+.ov{position:absolute;z-index:2}
+#title{left:34px;top:26px}
+#title .t1{font-weight:800;letter-spacing:.42em;font-size:13px;text-transform:uppercase}
+#title .t2{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:15px;margin-top:6px;opacity:.75}
+#counter{right:5vw;bottom:9vh;transform:rotate(-5deg);transform-origin:right bottom;text-align:right}
+#counter .lab{font-weight:800;font-size:11px;letter-spacing:.3em;text-transform:uppercase;margin-bottom:6px}
+#counter .lab b{display:inline-block;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid var(--red);margin-right:8px;vertical-align:-1px}
+#num{font-weight:900;font-size:clamp(34px,5.2vw,74px);line-height:.95;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+#counter .bar{height:9px;margin-top:10px;display:flex;justify-content:flex-end}
+#counter .bar i{display:block;height:100%}
+#counter .sub{margin-top:9px;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:15px}
+#counter .sub span{font-style:normal;font-family:inherit;font-weight:700}
+#score{right:34px;top:26px;width:236px}
+#score h3{margin:0 0 8px;font-weight:800;font-size:11px;letter-spacing:.3em;text-transform:uppercase}
+#score .row{display:grid;grid-template-columns:16px 1fr auto;gap:8px;align-items:center;font-size:13px;line-height:1;padding:4px 0;border-bottom:1px solid rgba(27,26,30,.22)}
+#score .dot{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(27,26,30,.85)}
+#score .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#score .am{font-variant-numeric:tabular-nums;font-weight:600}
+#today{right:5vw;top:46%;text-align:right;transform:rotate(3deg)}
+#today .k{font-weight:800;font-size:11px;letter-spacing:.3em;text-transform:uppercase}
+#today .v{font-weight:900;font-size:clamp(24px,2.8vw,40px);line-height:1;font-variant-numeric:tabular-nums}
+#today .f{font-family:Georgia,serif;font-style:italic;font-size:13px;opacity:.75}
+.demo{position:fixed;left:10px;bottom:10px;background:var(--yellow);font:800 11px/1 sans-serif;letter-spacing:.1em;padding:6px 8px;display:none;z-index:5}
+@media (max-width:719px){
+  #title{left:18px;top:18px}
+  #counter{left:18px;right:auto;top:84px;bottom:auto;transform:rotate(-4deg);transform-origin:left top;text-align:left}
+  #counter .bar{justify-content:flex-start}
+  #num{font-size:min(34px,8.6vw)}
+  #today{left:auto;right:18px;top:236px;transform:rotate(2deg)}
+  #score{left:18px;right:18px;width:auto;top:auto}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div class="ov" id="title"><div class="t1">Token Burn</div><div class="t2">Composition in tokens, no. <span id="opus">1</span></div></div>
+  <div class="ov" id="score"><h3>Voices</h3><div id="rows"></div></div>
+  <div class="ov" id="today"><div class="k">today</div><div class="v" id="tv">0</div><div class="f" id="tf"></div></div>
+  <div class="ov" id="counter"><div class="lab"><b></b>tokens burned</div><div id="num">0</div><div class="bar" id="bar"></div><div class="sub" id="sub"></div></div>
+</div>
+<div class="demo" id="demo">SAMPLE DATA</div>
+<script src="tb-data.js"></script>
+<script>
+(function(){
+const stage=document.getElementById('stage'),cv=document.getElementById('cv'),cx=cv.getContext('2d');
+const RING=['#22306f','#e8bf2e','#c7372b','#2f6b4f','#6a3d8f','#f4efe3','#1b1a1e','#d9862b','#7aa3c8'];
+let D=null,W=0,H=0,narrow=false,dpr=1,comp=null,paper=null,circles=[],sparks=[],bursts=[],disp=0,target=0,lastStep=null,t=0,raf=0,prev=performance.now();
+let seedv=11;const rnd=()=>(seedv=(seedv*16807)%2147483647)/2147483647;
+
+function mix(hex,to,a){const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));const A=p(hex),B=p(to);return`rgb(${A.map((v,i)=>Math.round(v+(B[i]-v)*a)).join(',')})`}
+function rgba(hex,a){const p=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));return`rgba(${p.join(',')},${a})`}
+
+// anchor slots (normalised inside the composition rect); biggest voice first, upper-left like Composition VIII
+const SLOTS_WIDE=[[.25,.38],[.55,.6],[.65,.2],[.37,.82],[.1,.76],[.79,.68],[.45,.1],[.6,.88],[.8,.42],[.07,.2],[.5,.36],[.3,.06]];
+const SLOTS_TALL=[[.4,.25],[.7,.62],[.8,.1],[.25,.6],[.45,.86],[.84,.8],[.1,.45],[.82,.4],[.2,.8],[.1,.06],[.55,.45],[.6,.04]];
+
+function layout(){
+  const vw=document.documentElement.clientWidth; if(!vw){setTimeout(layout,100);return}
+  narrow=vw<720; W=vw;
+  const rowsN=D?D.models.length:6;
+  H=narrow?Math.max(innerHeight,280+700+60+rowsN*24+60):Math.max(600,innerHeight);
+  stage.style.height=H+'px';
+  dpr=Math.min(2,devicePixelRatio||1);cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+  comp=narrow?{x:0,y:280,w:W,h:700}:{x:0,y:0,w:W-290,h:H};
+  if(narrow){document.getElementById('score').style.top=(comp.y+comp.h+40)+'px'}else document.getElementById('score').style.top='';
+  buildPaper();
+  if(D)buildCircles();
+}
+function buildPaper(){
+  paper=document.createElement('canvas');paper.width=W*dpr;paper.height=H*dpr;const p=paper.getContext('2d');p.scale(dpr,dpr);
+  const g=p.createRadialGradient(W*.45,H*.4,40,W*.5,H*.5,Math.max(W,H)*.8);g.addColorStop(0,'#f4ecd8');g.addColorStop(1,'#e2d2ad');p.fillStyle=g;p.fillRect(0,0,W,H);
+  seedv=99;
+  for(let i=0;i<Math.min(9000,W*H/90);i++){p.fillStyle=`rgba(${rnd()<.5?'120,90,50':'255,255,255'},${rnd()*.06})`;p.fillRect(rnd()*W,rnd()*H,1+rnd()*1.5,1+rnd()*1.5)}
+  // soft colour fields (pale planes)
+  const C=comp,planes=[['#7aa3c8',.16,[[.02,.05],[.42,.0],[.55,.42],[.1,.55]]],['#e9a7a0',.17,[[.48,.48],[.98,.36],[.92,.98],[.4,.9]]],['#efd36c',.2,[[.6,.02],[.95,.1],[.82,.4],[.58,.3]]]];
+  for(const [c,a,pts] of planes){p.fillStyle=rgba(c,a);p.beginPath();pts.forEach(([x,y],i)=>{const X=C.x+x*C.w,Y=C.y+y*C.h;i?p.lineTo(X,Y):p.moveTo(X,Y)});p.closePath();p.fill()}
+}
+function buildCircles(){
+  const C=comp,S=narrow?SLOTS_TALL:SLOTS_WIDE,m=Math.min(C.w,C.h);
+  const rmax=m*(narrow?.26:.24),rmin=m*.035;
+  circles=D.models.slice(0,S.length).map((md,i)=>{
+    const old=circles.find(c=>c.name===md.name);
+    const r=rmin+(rmax-rmin)*Math.sqrt(md.share);
+    return{name:md.name,tokens:md.tokens,share:md.share,col:mix(md.color,'#1b1a1e',.12),hex:md.color,
+      x:C.x+S[i][0]*C.w,y:C.y+S[i][1]*C.h,r,cr:old?old.cr:0,ph:i*1.7,dir:i%2?1:-1,rings:2+(i%3),i}
+  });
+}
+
+// --- the counter as typography ---
+function setText(){
+  if(!D)return;
+  document.getElementById('tv').textContent=TB.fmt(D.today);
+  document.getElementById('tf').textContent=TB.full(D.today)+' tokens · intensity '+Math.round(D.intensity*100)+'%';
+  const tot=Math.max(1,D.measured+D.estimated),mf=D.measured/tot;
+  document.getElementById('bar').innerHTML=`<i style="width:${Math.round(mf*240)}px;background:#1b1a1e"></i><i style="width:${Math.round((1-mf)*240)}px;background:repeating-linear-gradient(135deg,#1b1a1e 0 2px,transparent 2px 6px)"></i>`;
+  document.getElementById('sub').innerHTML=`<span>${TB.fmt(D.measured)}</span> measured &nbsp;·&nbsp; <span>${TB.fmt(D.estimated)}</span> estimated &nbsp;·&nbsp; <span>${TB.fmt(D.week)}</span> this week`;
+  document.getElementById('rows').innerHTML=D.models.map(m=>`<div class="row"><span class="dot" style="background:${m.color}"></span><span class="nm">${m.name}</span><span class="am">${TB.fmt(m.tokens)} <small style="opacity:.6">${m.share<.001?'<0.1':(m.share*100).toFixed(1)}%</small></span></div>`).join('');
+  document.getElementById('opus').textContent=D.days.length;
+  document.getElementById('demo').style.display=D.demo?'block':'none';
+}
+
+// --- drawing helpers ---
+function tri(x,y,s,rot,fill,stroke){cx.save();cx.translate(x,y);cx.rotate(rot);cx.beginPath();cx.moveTo(0,-s);cx.lineTo(s*.62,s*.7);cx.lineTo(-s*.62,s*.7);cx.closePath();if(fill){cx.fillStyle=fill;cx.fill()}if(stroke){cx.strokeStyle=stroke;cx.lineWidth=2;cx.stroke()}cx.restore()}
+function line(x1,y1,x2,y2,w,c){cx.strokeStyle=c||'#1b1a1e';cx.lineWidth=w;cx.beginPath();cx.moveTo(x1,y1);cx.lineTo(x2,y2);cx.stroke()}
+
+function drawStatic(E){
+  const C=comp,X=v=>C.x+v*C.w,Y=v=>C.y+v*C.h,s=Math.sin;
+  // long crossing lines (they sway a little)
+  cx.lineCap='round';
+  const L=[[.0,.62,.7,.04,2.2],[.05,.98,.95,.45,1.4],[.3,.0,.52,1,1.2],[.68,.02,.4,.98,3.2],[.0,.3,1,.52,1],[.15,.05,.9,.95,1.6],[.82,.0,.9,1,1]];
+  L.forEach(([a,b,c,d,w],i)=>{const o=s(t*.3*E+i)*4*E;line(X(a),Y(b)+o,X(c),Y(d)-o,w)});
+  // checkerboard
+  const cbx=X(narrow?.74:.4),cby=Y(narrow?.92:.66),cs=narrow?12:15;
+  for(let i=0;i<5;i++)for(let j=0;j<5;j++){if((i+j)%2)continue;cx.fillStyle=['#1b1a1e','#c7372b','#22306f','#e8bf2e'][(i*3+j)%4];cx.fillRect(cbx+i*cs,cby+j*cs,cs,cs)}
+  cx.strokeStyle='#1b1a1e';cx.lineWidth=1.5;cx.strokeRect(cbx,cby,cs*5,cs*5);
+  // fan of arcs
+  const fx=X(narrow?.86:.86),fy=Y(narrow?.3:.12);
+  for(let k=0;k<6;k++){cx.strokeStyle=k%2?'#c7372b':'#1b1a1e';cx.lineWidth=k%3?1.4:2.6;cx.beginPath();cx.arc(fx,fy,14+k*9,Math.PI*.9+s(t*.4*E)*.2,Math.PI*1.6+s(t*.4*E)*.2);cx.stroke()}
+  // grid of parallel strokes
+  const gx=X(narrow?.36:.16),gy=Y(narrow?.97:.9);
+  for(let k=0;k<7;k++)line(gx+k*7,gy-24,gx+k*7+12,gy+10,1.4);
+  // floating triangles
+  tri(X(.9),Y(.55),18,t*.25*E,'#1b1a1e');
+  tri(X(.12),Y(.42),13,-t*.3*E+1,null,'#1b1a1e');
+  tri(X(.52),Y(.32),10,t*.5*E,'#c7372b');
+}
+
+function drawDays(E){
+  const C=comp,days=D.days;if(!days.length)return;
+  const ax=C.x+C.w*(narrow?.04:.04),ay=C.y+C.h*(narrow?.97:.94),bx=C.x+C.w*(narrow?.96:.74),by=C.y+C.h*(narrow?.04:.08);
+  const dx=bx-ax,dy=by-ay,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
+  const maxL=narrow?46:70;
+  line(ax,ay,bx,by,1.2,'rgba(27,26,30,.7)');
+  const n=days.length;
+  days.forEach((x,i)=>{
+    const f=(i+.5)/n,px=ax+dx*f,py=ay+dy*f,v=Math.sqrt(x.tokens/D.maxDay);
+    let dom=null,dv=-1;for(const k in x.byModel)if(x.byModel[k]>dv){dv=x.byModel[k];dom=k}
+    const col=TB.color(dom),isT=x.d===D.todayISO,side=i%2?1:-1;
+    const wob=Math.sin(t*1.4*E+i*.6)*3*E;
+    const l=6+v*maxL+(isT?Math.sin(t*4)*5:0);
+    cx.lineCap='butt';
+    if(x.est>x.tokens/2){cx.setLineDash([3,3])}
+    line(px,py,px+nx*l*side+ux*wob,py+ny*l*side+uy*wob,isT?4:2.2,isT?'#c7372b':mix(col,'#1b1a1e',.25));
+    cx.setLineDash([]);
+    cx.fillStyle=isT?'#c7372b':'#1b1a1e';cx.beginPath();cx.arc(px+nx*l*side,py+ny*l*side,isT?5:1.6+v*2.4,0,7);cx.fill();
+  });
+  cx.save();cx.translate(ax,ay);cx.rotate(Math.atan2(dy,dx));cx.fillStyle='#1b1a1e';cx.font='italic 12px Georgia,serif';
+  cx.fillText(days[0].d+'  →  '+days.length+' days of rhythm  →  today',8,18);cx.restore();
+}
+
+function drawCircle(c,E,i){
+  c.cr+= (c.r-c.cr)*.05;
+  const r=c.cr; if(r<1)return;
+  const amp=4+E*16,x=c.x+Math.sin(t*.35+c.ph)*amp,y=c.y+Math.cos(t*.28+c.ph*1.3)*amp*.8;
+  c.px=x;c.py=y;
+  // halo
+  const g=cx.createRadialGradient(x,y,r*.85,x,y,r*1.5);g.addColorStop(0,rgba(c.hex,.45));g.addColorStop(1,rgba(c.hex,0));
+  cx.fillStyle=g;cx.beginPath();cx.arc(x,y,r*1.5,0,7);cx.fill();
+  if(i===0){cx.fillStyle='#1b1a1e';cx.beginPath();cx.arc(x,y,r*1.06,0,7);cx.fill()}
+  cx.fillStyle=c.col;cx.beginPath();cx.arc(x,y,r,0,7);cx.fill();
+  // concentric rings, slightly off-centre, drifting with energy
+  for(let k=1;k<=c.rings;k++){const rr=r*(1-k*.24);if(rr<2)break;
+    const ox=Math.sin(t*.6*E+k+c.ph)*r*.05*k,oy=Math.cos(t*.5*E+k)*r*.05*k;
+    cx.fillStyle=RING[(c.i*2+k)%RING.length];cx.beginPath();cx.arc(x+ox,y+oy,rr,0,7);cx.fill()}
+  // orbiting arc + satellite
+  const a=t*(.12+E*.9)*c.dir+c.ph,ar=r*1.18+4;
+  cx.strokeStyle='#1b1a1e';cx.lineWidth=i===0?3:1.6;cx.beginPath();cx.arc(x,y,ar,a,a+Math.PI*1.1);cx.stroke();
+  cx.fillStyle=RING[(c.i+3)%RING.length];cx.beginPath();cx.arc(x+Math.cos(a)*ar,y+Math.sin(a)*ar,Math.max(3,r*.09),0,7);cx.fill();
+  // label
+  if(r>18||narrow){
+    const f1=`800 ${i===0?15:12}px Futura,"Century Gothic","Liberation Sans",sans-serif`;cx.font=f1;const tw=cx.measureText(c.name.toUpperCase()).width+6;
+    const left=x+r*.72+10+tw>W-6,sx=left?-1:1,lx=x+sx*(r*.72+10),ly=y-r*.72-6;
+    line(x+sx*r*.7,y-r*.7,lx,ly,1,'rgba(27,26,30,.6)');
+    cx.textAlign=left?'right':'left';const tx=lx+sx*3;
+    cx.fillStyle='#1b1a1e';cx.fillText(c.name.toUpperCase(),tx,ly);
+    cx.font=`italic ${i===0?14:11}px Georgia,serif`;cx.fillText(TB.fmt(c.tokens),tx,ly+(i===0?17:14));cx.textAlign='left'}
+}
+
+function drawToday(E){
+  // the yellow triangle of today: its size is today's intensity
+  const el=document.getElementById('today'),b=el.getBoundingClientRect(),sb=stage.getBoundingClientRect();
+  const x=b.left-sb.left-(narrow?40:70),y=b.top-sb.top+b.height*.5,s=14+D.intensity*(narrow?34:56);
+  cx.save();cx.translate(x,y);cx.rotate(Math.sin(t*.8*E)*.2*E-.2);
+  cx.fillStyle='#e8bf2e';cx.beginPath();cx.moveTo(0,-s);cx.lineTo(s*.55,s*.8);cx.lineTo(-s*.55,s*.8);cx.closePath();cx.fill();
+  cx.strokeStyle='#1b1a1e';cx.lineWidth=1.5;cx.stroke();cx.restore();
+}
+
+function frame(){
+  const now=performance.now(),dt=Math.min(.1,(now-prev)/1000);prev=now;
+  if(D&&comp){
+    const E=.25+D.intensity*.95; t+=dt;
+    // counter ticks toward the target
+    const diff=target-disp;disp+=Math.abs(diff)<1?diff:diff*Math.min(1,dt*1.6)+Math.sign(diff);
+    const s=TB.full(disp),el=document.getElementById('num');if(el.textContent!==s)el.textContent=s;
+    const step=Math.floor(disp/1e8);if(lastStep!==null&&step>lastStep)milestone();lastStep=step;
+    cx.setTransform(dpr,0,0,dpr,0,0);
+    cx.drawImage(paper,0,0,W,H);
+    drawStatic(E);
+    drawDays(E);
+    for(let i=circles.length-1;i>=0;i--)drawCircle(circles[i],E,i);
+    drawToday(E);
+    // sparks: tiny shapes rising, count from intensity
+    const want=Math.round(10+D.intensity*34);while(sparks.length<want)sparks.push(newSpark(true));sparks.length=Math.min(sparks.length,want);
+    for(const p of sparks){p.y-=p.v*dt*(.5+E);p.x+=Math.sin(t+p.ph)*.3;p.a+=dt*p.w*E;if(p.y<comp.y-10){Object.assign(p,newSpark(false))}
+      cx.save();cx.translate(p.x,p.y);cx.rotate(p.a);cx.fillStyle=p.c;
+      if(p.k===0){cx.beginPath();cx.arc(0,0,p.s,0,7);cx.fill()}else if(p.k===1){cx.fillRect(-p.s,-p.s/3,p.s*2,p.s/1.5)}else{cx.beginPath();cx.moveTo(0,-p.s);cx.lineTo(p.s,p.s);cx.lineTo(-p.s,p.s);cx.fill()}
+      cx.restore()}
+    // milestone bursts
+    bursts=bursts.filter(b=>b.t<1.6);
+    for(const b of bursts){b.t+=dt;const k=b.t/1.6;cx.strokeStyle=`rgba(27,26,30,${1-k})`;cx.lineWidth=2;
+      for(let j=0;j<18;j++){const a=j/18*Math.PI*2,r1=20+k*60,r2=r1+30+k*120;line(b.x+Math.cos(a)*r1,b.y+Math.sin(a)*r1,b.x+Math.cos(a)*r2,b.y+Math.sin(a)*r2,2,`rgba(${j%3?'27,26,30':'199,55,43'},${1-k})`)}
+      cx.strokeStyle=`rgba(232,191,46,${1-k})`;cx.lineWidth=6*(1-k);cx.beginPath();cx.arc(b.x,b.y,30+k*220,0,7);cx.stroke()}
+  }
+  raf=requestAnimationFrame(frame);
+}
+function newSpark(any){const C=comp;return{x:C.x+Math.random()*C.w,y:any?C.y+Math.random()*C.h:C.y+C.h+10,v:8+Math.random()*24,s:1.5+Math.random()*3.5,a:Math.random()*6,w:(Math.random()-.5)*2,ph:Math.random()*6,k:(Math.random()*3)|0,c:RING[(Math.random()*RING.length)|0]}}
+let born=performance.now();
+function milestone(){if(performance.now()-born<4000)return;const el=document.getElementById('num'),b=el.getBoundingClientRect(),sb=stage.getBoundingClientRect();bursts.push({x:b.left-sb.left+b.width/2,y:b.top-sb.top+b.height/2,t:0});if(circles[0])circles[0].cr*=1.15}
+
+TB.onData(d=>{
+  const first=!D;D=d;target=d.total;
+  if(first){disp=Math.max(0,d.total-Math.max(d.today*.03,Math.min(d.total*.002,5e6)));lastStep=Math.floor(disp/1e8);layout()}
+  else buildCircles();
+  setText();
+});
+let lw=innerWidth,lh=innerHeight,rt=0;
+addEventListener('resize',()=>{if(innerWidth===lw&&innerHeight===lh)return;lw=innerWidth;lh=innerHeight;clearTimeout(rt);rt=setTimeout(()=>{layout()},120)});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelAnimationFrame(raf);else{prev=performance.now();raf=requestAnimationFrame(frame)}});
+raf=requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

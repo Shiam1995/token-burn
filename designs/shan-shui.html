@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shan Shui Scroll</title>
+<meta name="description" content="A Chinese ink-wash handscroll that slowly unrolls: every mountain peak is a day of tokens, today's flow feeds the waterfall, each model sails a boat on the river, and a red seal carries the total.">
+<style>
+:root{
+  --silk:#ece0c4; --silk2:#e0cfaa; --ink:#1b1c1f; --ink2:#3b3a37; --pale:#7d776b; --seal:#b5302a; --seal2:#8e211c;
+  --mount:#2f4a46; --mount2:#24393a; --wood:#5a3a22; --sheet:#f2e8d2;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:#2a2622;background:radial-gradient(ellipse at 40% 30%,#3b342c 0%,#1f1b18 70%);color:var(--ink);
+  font-family:"Noto Serif CJK SC","Noto Serif CJK TC","Noto Serif CJK JP","Songti SC",Georgia,serif;overflow-x:hidden}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 318px;gap:18px;height:100vh;padding:18px 18px 18px 18px}
+/* the handscroll */
+.scroll{position:relative;min-height:0;padding:14px 30px;background:
+   repeating-linear-gradient(45deg,rgba(255,255,255,.035) 0 6px,rgba(0,0,0,.04) 6px 12px),linear-gradient(var(--mount),var(--mount2));
+   border-radius:3px;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+.scroll:before,.scroll:after{content:"";position:absolute;top:-8px;bottom:-8px;width:22px;border-radius:11px;
+  background:linear-gradient(90deg,#2b1a0e,#7a5233 35%,#a37a52 50%,#6b4428 70%,#2b1a0e);box-shadow:0 6px 14px rgba(0,0,0,.5)}
+.scroll:before{left:-6px}.scroll:after{right:-6px}
+.silk{position:relative;width:100%;height:100%;overflow:hidden;background:var(--silk);box-shadow:inset 0 0 0 1px rgba(0,0,0,.25),inset 0 0 60px rgba(90,60,20,.25);cursor:grab;touch-action:pan-y}
+.silk.drag{cursor:grabbing}
+.silk canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.colophon{position:absolute;left:22px;top:16px;display:flex;gap:16px;align-items:flex-start;pointer-events:none;
+  padding:10px 24px 18px 10px;background:radial-gradient(ellipse at 40% 45%,rgba(236,224,196,.92) 0%,rgba(236,224,196,.75) 55%,rgba(236,224,196,0) 75%)}
+.kicker{font-size:12px;letter-spacing:.32em;text-transform:uppercase;color:var(--ink2)}
+.kicker b{color:var(--seal);font-weight:700;letter-spacing:.1em}
+.total{font-size:clamp(30px,4.6vw,62px);font-weight:900;line-height:1.05;margin:4px 0 2px;letter-spacing:.01em;filter:url(#bleed);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sub{font-size:13px;color:var(--ink2)}
+.seal{width:92px;height:92px;flex:none;transform:rotate(-4deg);margin-top:6px;transform-origin:50% 50%}
+.seal.stamp{animation:stamp .9s cubic-bezier(.2,1.6,.4,1)}
+@keyframes stamp{0%{transform:rotate(-4deg) scale(1.6);opacity:0}60%{opacity:1}100%{transform:rotate(-4deg) scale(1)}}
+.inscr{position:absolute;right:20px;top:18px;display:flex;flex-direction:row-reverse;gap:6px;pointer-events:none;
+  padding:10px 8px 26px 26px;background:radial-gradient(ellipse at 60% 40%,rgba(236,224,196,.9) 0%,rgba(236,224,196,.6) 55%,rgba(236,224,196,0) 75%)}
+.inscr div{writing-mode:vertical-rl;font-size:19px;line-height:1.25;letter-spacing:.12em;color:var(--ink);filter:url(#bleed)}
+.inscr .small{font-size:14px;color:var(--ink2)}
+.inscr .mini{width:20px;height:20px;background:var(--seal);color:#f5e6d0;font-size:11px;writing-mode:horizontal-tb;display:grid;place-items:center;align-self:flex-end;margin-top:6px}
+.tip{position:absolute;pointer-events:none;background:rgba(242,232,210,.96);border:1px solid rgba(27,28,31,.5);padding:6px 9px;font-size:12px;line-height:1.35;white-space:nowrap;opacity:0;transition:opacity .15s;box-shadow:2px 3px 0 rgba(0,0,0,.12)}
+.tip b{font-size:14px}
+.hint{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font-size:11px;letter-spacing:.2em;color:rgba(27,28,31,.55);pointer-events:none;white-space:nowrap}
+/* side sheet */
+.sheet{min-height:0;overflow:auto;background:var(--sheet);background:linear-gradient(180deg,#f4ebd6,#e9dcc0);padding:20px 20px 16px;border-radius:2px;box-shadow:0 18px 40px rgba(0,0,0,.45),inset 0 0 0 1px rgba(0,0,0,.2),inset 0 0 0 6px #f4ebd6,inset 0 0 0 7px rgba(27,28,31,.35)}
+.sheet h2{font-size:12px;letter-spacing:.3em;text-transform:uppercase;font-weight:600;margin:14px 0 8px;color:var(--ink2);display:flex;align-items:center;gap:8px}
+.sheet h2:first-child{margin-top:4px}
+.sheet h2 i{font-style:normal;font-size:15px;letter-spacing:0;color:var(--seal)}
+.sheet h2:after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(27,28,31,.45),transparent)}
+.big{font-size:34px;font-weight:900;line-height:1;filter:url(#bleed)}
+.full{font-size:12px;color:var(--pale);margin-top:3px;font-variant-numeric:tabular-nums}
+.row2{display:flex;gap:14px;margin-top:10px}
+.row2>div{flex:1}
+.lab{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--pale)}
+.mid{font-size:20px;font-weight:700}
+.split{height:12px;margin:8px 0 6px;position:relative;background:rgba(125,119,107,.25)}
+.split span{position:absolute;left:0;top:0;bottom:0;background:var(--ink);filter:url(#bleed)}
+.splitl{display:flex;justify-content:space-between;font-size:12px}
+.splitl em{font-style:normal;color:var(--pale)}
+.models{list-style:none;margin:0;padding:0}
+.models li{display:grid;grid-template-columns:18px minmax(0,1fr) auto 46px;gap:8px;align-items:center;font-size:13px;padding:4px 0;border-bottom:1px dotted rgba(27,28,31,.22)}
+.models .dot{width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 2px rgba(27,28,31,.75)}
+.models .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.models .tk{font-weight:700;font-variant-numeric:tabular-nums}
+.models .sh{text-align:right;color:var(--pale);font-size:11px;font-variant-numeric:tabular-nums}
+.legend{font-size:12px;line-height:1.5;color:var(--ink2)}
+.legend span{display:inline-block;width:22px;height:9px;vertical-align:middle;margin-right:6px}
+.demo{color:var(--seal);font-size:11px;letter-spacing:.15em;margin-top:8px}
+@media (max-width:760px){
+  .wrap{display:block;height:auto;padding:12px 16px}
+  .scroll{height:64vh;min-height:430px;padding:10px 16px}
+  .scroll:before{left:-5px;width:16px}.scroll:after{right:-5px;width:16px}
+  .sheet{margin-top:16px;overflow:visible}
+  .inscr{display:none}
+  .colophon{left:8px;top:8px;gap:8px;padding:6px 14px 12px 6px}
+  .seal{width:58px;height:58px}
+  .kicker{font-size:10px;letter-spacing:.22em}
+  .sub{font-size:11px}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="bleed" x="-5%" y="-10%" width="110%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="3" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="rough" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".055" numOctaves="3" seed="9" result="t"/>
+    <feDisplacementMap in="SourceGraphic" in2="t" scale="2" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="2" seed="4" result="g"/>
+    <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.9" result="m"/>
+    <feComposite in="d" in2="m" operator="in"/>
+  </filter>
+</svg>
+<div class="wrap">
+  <div class="scroll">
+    <div class="silk" id="silk">
+      <canvas id="c"></canvas>
+      <div class="colophon">
+        <div>
+          <div class="kicker">Token Burn · <b>山水</b></div>
+          <div class="total" id="total">0</div>
+          <div class="sub" id="since">tokens burned</div>
+        </div>
+        <svg class="seal" id="seal" viewBox="0 0 100 100" aria-label="seal">
+          <g filter="url(#rough)">
+            <rect x="4" y="4" width="92" height="92" rx="4" fill="#b5302a"/>
+            <rect x="11" y="11" width="78" height="78" fill="none" stroke="#f2e2cc" stroke-width="3"/>
+            <text x="50" y="35" text-anchor="middle" font-size="17" font-weight="900" fill="#f2e2cc" font-family="Noto Serif CJK SC,serif">燒 總</text>
+            <text id="sealv" x="50" y="64" text-anchor="middle" font-size="25" font-weight="900" fill="#f2e2cc" font-family="Noto Serif CJK SC,serif">—</text>
+            <text x="50" y="82" text-anchor="middle" font-size="10" letter-spacing="2" fill="#f2e2cc" font-family="Noto Serif CJK SC,serif">TOKENS</text>
+          </g>
+        </svg>
+      </div>
+      <div class="inscr" id="inscr"></div>
+      <div class="tip" id="tip"></div>
+    </div>
+  </div>
+  <aside class="sheet">
+    <h2><i>今</i>Today</h2>
+    <div class="big" id="today">—</div>
+    <div class="full" id="todayFull"></div>
+    <div class="row2">
+      <div><div class="lab">This week</div><div class="mid" id="week">—</div></div>
+      <div><div class="lab">Days burned</div><div class="mid" id="ndays">—</div></div>
+    </div>
+    <h2><i>墨</i>Measured · estimated</h2>
+    <div class="split"><span id="splitBar"></span></div>
+    <div class="splitl"><div><b id="meas">—</b> <em>measured</em></div><div><b id="est">—</b> <em>estimated</em></div></div>
+    <div class="legend" style="margin-top:8px">每峰一日 · each peak is one day, its height the tokens burned. The scroll unrolls by itself; drag it, hover a peak.<br><span style="background:#1b1c1f"></span>wet ink peak: counted from logs<br><span style="background:#a39a88"></span>dry pale peak: day partly estimated</div>
+    <h2><i>舟</i>Boats on the river</h2>
+    <ul class="models" id="models"></ul>
+    <h2><i>瀑</i>The waterfall</h2>
+    <div class="legend" id="fallTxt">Its flow is today's intensity.</div>
+    <div class="demo" id="demo"></div>
+  </aside>
+</div>
+<script src="tb-data.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const silk = $("silk"), cv = $("c"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1, D = null, sig = "";
+let layers = null;           // offscreen ink layers
+let pan = 0, panDir = 1, maxPan = 0, dragging = false, dragX = 0, dragPan = 0, idleUntil = 0;
+let peaks = [], cliff = null;              // {x, top, base, w, d}
+let shown = 0, tFrom = 0, tTo = 0, tStart = 0, lastMil = -1;
+let geese = [], nextGeese = 6, ripples = [], spray = [];
+let hover = -1, mouse = null;
+
+/* ---------- utils ---------- */
+function rng(s){return function(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R0 = rng(11); const NT = Array.from({length:1024},()=>R0()*2-1);
+function noise(x){const i=Math.floor(x),f=x-i,u=f*f*(3-2*f);return NT[i&1023]*(1-u)+NT[(i+1)&1023]*u}
+function fbm(x){return noise(x)*.6+noise(x*2.1+7)*.28+noise(x*4.3+3)*.12}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const CN = "零一二三四五六七八九";
+function cnGroup(n){ // 0..9999
+  const u=["千","百","十",""],d=[Math.floor(n/1000),Math.floor(n/100)%10,Math.floor(n/10)%10,n%10];
+  let s="",zero=false;
+  for(let i=0;i<4;i++){if(d[i]===0){if(s)zero=true;continue}if(zero){s+="零";zero=false}s+=CN[d[i]]+u[i]}
+  return s;
+}
+function cnNum(n){
+  n=Math.round(n); if(!n) return "零";
+  const yi=Math.floor(n/1e8), wan=Math.floor(n/1e4)%1e4, rest=n%1e4; let s="";
+  if(yi) s+=cnGroup(yi)+"億";
+  if(wan) s+=(s&&wan<1000?"零":"")+cnGroup(wan)+"萬"; else if(s&&rest) s+="零";
+  if(rest) s+=(s&&rest<1000&&wan?"零":"")+cnGroup(rest);
+  return s.replace(/^一十/,"十");
+}
+const MON_EN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MON_CN=["正月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","臘月"];
+const fmtDate=s=>{const [y,m,d]=s.split("-");return +d+" "+MON_EN[+m-1]+" "+y};
+
+/* ---------- sizing ---------- */
+function resize(){
+  const r = silk.getBoundingClientRect();
+  W = Math.max(200, r.width|0); H = Math.max(200, r.height|0);
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  cv.width = W*DPR; cv.height = H*DPR;
+  if (D) build();
+}
+const groundY = () => H*(W < 600 ? .62 : .69);
+
+/* ---------- ink drawing primitives ---------- */
+function inkRGBA(est,a){return est?`rgba(104,96,84,${a})`:`rgba(24,25,28,${a})`}
+function drawPine(g, x, y, s, r, est){
+  // trunk
+  g.strokeStyle = inkRGBA(est,.9); g.lineCap="round";
+  const lean = (r()-.5)*.5*s;
+  g.lineWidth = Math.max(1, s*.07);
+  g.beginPath(); g.moveTo(x,y); g.quadraticCurveTo(x+lean*.3, y-s*.5, x+lean, y-s); g.stroke();
+  const tiers = 4 + (r()*3|0);
+  for (let i=0;i<tiers;i++){
+    const t = (i+1)/tiers, ty = y - s*(.25+.75*t), tx = x + lean*(.25+.75*t);
+    const half = s*(.42 - .26*t) * (0.8+r()*.4), side = r()<.5?-1:1;
+    // needle clusters: short strokes fanning from a centre
+    g.fillStyle = inkRGBA(est,.78);
+    g.beginPath(); g.ellipse(tx + side*half*.15, ty, half, s*.06+1, (r()-.5)*.25, 0, Math.PI*2); g.fill();
+    g.lineWidth = .7; g.strokeStyle = inkRGBA(est,.8);
+    for (let k=0;k<7;k++){
+      const a = -Math.PI*.9 + k/6*Math.PI*.8, cx = tx + side*half*.15;
+      g.beginPath(); g.moveTo(cx + Math.cos(a)*half*.3, ty); g.lineTo(cx + Math.cos(a)*half*1.05, ty + Math.sin(a)*s*.09 - 1); g.stroke();
+    }
+  }
+}
+function drawDotTree(g, x, y, s, r, est){
+  g.strokeStyle = inkRGBA(est,.8); g.lineWidth = Math.max(.8,s*.06);
+  g.beginPath(); g.moveTo(x,y); g.lineTo(x+(r()-.5)*3, y-s*.6); g.stroke();
+  g.fillStyle = inkRGBA(est,.7);
+  for (let k=0;k<26;k++){const a=r()*Math.PI*2, d=Math.sqrt(r())*s*.38;
+    g.beginPath(); g.ellipse(x+Math.cos(a)*d, y-s*.7+Math.sin(a)*d*.8, 1.6+r()*1.2, 1+r()*.8, a, 0, Math.PI*2); g.fill();}
+}
+function mountain(g, cx, base, h, w, seed, opt){
+  const r = rng(seed), est = opt.est, paper = opt.paper||"236,224,196";
+  const asym = .8 + r()*.6, sh = (r()-.5)*1.1, shH = .35 + r()*.3, o = r()*500, sharp = 1.25 + r()*.4;
+  const pts = [];
+  for (let u=-1; u<=1.0001; u+=0.02){
+    const a = u<0 ? 1 : asym;
+    let p = Math.exp(-Math.pow(Math.abs(u*2.1*a), sharp));
+    p = Math.max(p, shH*Math.exp(-Math.pow(Math.abs((u-sh)*3.4),1.6)));
+    p *= 1 + .07*noise(u*7+o) + .03*noise(u*19+o);
+    pts.push([cx+u*w, base - h*Math.max(0,p)]);
+  }
+  const top = Math.min(...pts.map(p=>p[1]));
+  const path = new Path2D(); path.moveTo(pts[0][0], base+30);
+  for (const p of pts) path.lineTo(p[0], p[1]);
+  path.lineTo(pts[pts.length-1][0], base+30); path.closePath();
+  // 1. paper body occludes what is behind, dissolving into mist at the base
+  let gr = g.createLinearGradient(0, top, 0, base+10);
+  gr.addColorStop(0, `rgba(${paper},1)`); gr.addColorStop(.62, `rgba(${paper},.9)`); gr.addColorStop(1, `rgba(${paper},0)`);
+  g.fillStyle = gr; g.fill(path);
+  // 2. ink wash
+  const a0 = opt.alpha ?? (est ? .36 : .74);
+  gr = g.createLinearGradient(0, top, 0, base+8);
+  gr.addColorStop(0, inkRGBA(est,a0)); gr.addColorStop(.3, inkRGBA(est,a0*.55)); gr.addColorStop(.75, inkRGBA(est,a0*.14)); gr.addColorStop(1, inkRGBA(est,0));
+  g.fillStyle = gr; g.fill(path);
+  if (opt.simple) return {top, pts};
+  // texture and side light go on a scratch canvas, then fade into mist at the base
+  const x0 = Math.floor(cx - w - 4), y0 = Math.floor(top - 4), tw = Math.ceil(w*2 + 8), th = Math.ceil(base + 30 - y0);
+  const tc = scratch(tw, th), t = tc.g;
+  t.save(); t.translate(-x0, -y0); t.clip(path);
+  gr = t.createLinearGradient(cx-w*.7, 0, cx+w*.7, 0);
+  gr.addColorStop(0, `rgba(${paper},.45)`); gr.addColorStop(.48, `rgba(${paper},0)`); gr.addColorStop(.55, "rgba(0,0,0,0)"); gr.addColorStop(1, est?"rgba(60,50,40,.14)":"rgba(0,0,0,.26)");
+  t.fillStyle = gr; t.fillRect(x0, y0, tw, th);
+  const n = 14 + (h/5|0);
+  t.lineCap = "round";
+  for (let k=0;k<n;k++){
+    const i = 6 + (r()*(pts.length-12)|0), [px,py] = pts[i];
+    const depth = r()*Math.min(h*.7, 120), sx = px + (r()-.5)*6, sy = py + 4 + depth;
+    const dir = pts[i+1][1] < py ? -1 : 1, len = 12 + r()*34;
+    t.strokeStyle = inkRGBA(est, (.2+r()*.32)*(1-depth/(h*.8+1)));
+    t.lineWidth = .5 + r()*1.3;
+    t.beginPath(); t.moveTo(sx, sy);
+    t.bezierCurveTo(sx+dir*len*.25, sy+len*.3, sx+dir*len*.15+(r()-.5)*8, sy+len*.65, sx+dir*len*.4, sy+len);
+    t.stroke();
+  }
+  for (let k=0;k<n*.5;k++){
+    const i = 4 + (r()*(pts.length-8)|0), [px,py] = pts[i];
+    t.fillStyle = inkRGBA(est, .08 + r()*.14);
+    t.beginPath(); t.ellipse(px+(r()-.5)*10, py+8+r()*h*.25, 3+r()*9, 1.5+r()*3, (r()-.5)*1.2, 0, Math.PI*2); t.fill();
+  }
+  t.restore();
+  t.globalCompositeOperation = "destination-in";
+  const fade = t.createLinearGradient(0, 0, 0, th);
+  fade.addColorStop(0, "#000"); fade.addColorStop(clamp((h*.55)/th,0,1), "rgba(0,0,0,.85)"); fade.addColorStop(clamp((base-y0-2)/th,0,1), "rgba(0,0,0,0)"); fade.addColorStop(1, "rgba(0,0,0,0)");
+  t.fillStyle = fade; t.fillRect(0, 0, tw, th); t.globalCompositeOperation = "source-over";
+  g.drawImage(tc.c, 0, 0, tw*SD, th*SD, x0, y0, tw, th);
+  // ridge line: a brush stroke, thick at the summit, broken (dry) for estimated days
+  for (let i=1;i<pts.length;i++){
+    const p = (base - pts[i][1]) / (h+1); if (p < .12) continue;
+    if (est && r() < .28) continue;
+    g.strokeStyle = inkRGBA(est, .55 + .4*p); g.lineWidth = .6 + 2.6*p*p;
+    g.beginPath(); g.moveTo(pts[i-1][0], pts[i-1][1]); g.lineTo(pts[i][0], pts[i][1]); g.stroke();
+  }
+  // moss dots (dian) along the ridge
+  const md = 5 + (r()*10|0);
+  g.fillStyle = inkRGBA(est, .85);
+  for (let k=0;k<md;k++){
+    const i = 10 + (r()*(pts.length-20)|0), [px,py] = pts[i]; if (base-py < h*.35) continue;
+    g.beginPath(); g.ellipse(px+(r()-.5)*4, py+1, 1.2+r()*1.6, .8+r()*1, r()*3, 0, Math.PI*2); g.fill();
+  }
+  return {top, pts};
+}
+
+let SC = null, SD = 1;
+function scratch(w, h){
+  SD = DPR; const cw = Math.ceil(w*SD), ch = Math.ceil(h*SD);
+  if (!SC || SC.c.width < cw || SC.c.height < ch){ const c = document.createElement("canvas"); c.width = Math.max(cw, SC? SC.c.width:0); c.height = Math.max(ch, SC? SC.c.height:0); SC = {c, g: c.getContext("2d")}; }
+  const g = SC.g; g.setTransform(1,0,0,1,0,0); g.globalCompositeOperation = "source-over"; g.clearRect(0,0,SC.c.width,SC.c.height); g.setTransform(SD,0,0,SD,0,0);
+  return SC;
+}
+/* ---------- build the scroll (offscreen layers) ---------- */
+function build(){
+  const days = D.days.length ? D.days : [{d:D.todayISO,tokens:0,est:0,byModel:{}}];
+  const n = days.length, mobile = W < 600;
+  const margin = W*0.32, spacing = Math.max(16, Math.min(mobile ? 52 : 74, ((15000/DPR - W)/1.25 - 2*margin - 100)/(n + 2.2)));
+  const worldW = Math.max(W, margin*2 + (n-1)*spacing + spacing*2.2 + 60);
+  maxPan = worldW - W;
+  const gy = groundY(), maxH = H*(mobile? .44 : .47);
+  const mk = (w) => { const c = document.createElement("canvas"); c.width = Math.ceil(w*DPR); c.height = Math.ceil(H*DPR); const g = c.getContext("2d"); g.scale(DPR,DPR); return {c,g,w}; };
+  // far ranges (parallax .4) – pale blue-grey wash, generated from noise
+  const farW = W + maxPan*.4, far = mk(farW);
+  for (let L=0; L<3; L++){
+    const g = far.g, base = gy - 10 - L*16, amp = H*(.16 + L*.05), col = [ "120,138,150","100,116,128","86,98,108" ][L], a = [.22,.28,.34][L];
+    g.save(); g.filter = `blur(${3-L}px)`;
+    g.beginPath(); g.moveTo(0, base+40);
+    for (let x=0; x<=farW; x+=6){ const v = fbm(x/260 + L*40)*.5+.5, s = Math.pow(v, 1.6); g.lineTo(x, base - H*.06 - s*amp); }
+    g.lineTo(farW, base+40); g.closePath();
+    const gr = g.createLinearGradient(0, base-amp-H*.06, 0, base+20);
+    gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(.6, `rgba(${col},${a*.45})`); gr.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = gr; g.fill(); g.restore();
+  }
+  // the day peaks (parallax 1)
+  const mid = mk(worldW), g = mid.g;
+  peaks = days.map((x,i)=>{
+    const hn = Math.pow(x.tokens/D.maxDay, .75), h = Math.max(H*.035, hn*maxH);
+    return {i, d:x, x: margin + i*spacing + (i? Math.sin(i*2.3)*spacing*.12 : 0), h, hn, base: gy + (1-hn)*18 - (i%2)*6, w: spacing*(1.0 + 1.5*hn), est: x.est > x.tokens*.5};
+  });
+  // the source cliff beyond today: its waterfall is today's flow
+  const lp = peaks[peaks.length-1];
+  cliff = {x: lp.x + spacing*2.2 + 40, h: maxH*.92, w: mobile? 70 : 96, base: gy + 2};
+  { const res = mountain(g, cliff.x, cliff.base, cliff.h, cliff.w, 4242, {est:false}); cliff.top = res.top; cliff.pts = res.pts;
+    const r = rng(77); for (let j=0;j<3;j++){ const idx = 50 + j*3, [tx,ty] = cliff.pts[idx]; drawPine(g, tx, ty+2, 22 + r()*12, r, false); } }
+  const order = peaks.slice().sort((a,b)=>b.h-a.h);
+  for (const p of order){
+    const res = mountain(g, p.x, p.base, p.h, p.w, 1000+p.i*37, {est:p.est});
+    p.top = res.top; p.pts = res.pts;
+    const r = rng(7+p.i*13);
+    // pines on the tall peaks, dotted trees on the lower ones
+    if (p.hn > .3){
+      const k = 1 + (p.hn > .6) + (p.hn > .85);
+      for (let j=0;j<k;j++){
+        const u = (j-(k-1)/2)*.12 + (r()-.5)*.06, idx = clamp(Math.round((u+1)/.02),0,p.pts.length-1);
+        const [tx,ty] = p.pts[idx]; drawPine(g, tx, ty+2, 14 + p.hn*20 + r()*6, r, p.est);
+      }
+    } else if (r() < .55){
+      const idx = clamp(Math.round((r()*.6-.3+1)/.02),0,p.pts.length-1), [tx,ty] = p.pts[idx];
+      drawDotTree(g, tx, ty+1, 12+r()*8, r, p.est);
+    }
+  }
+  // month marks along the bank
+  g.textAlign = "left"; g.textBaseline = "top";
+  let lastM = "";
+  for (const p of peaks){
+    const m = p.d.d.slice(0,7); if (m === lastM) continue; lastM = m;
+    const mo = +p.d.d.slice(5,7)-1, x = p.x - spacing*.4;
+    g.fillStyle = "rgba(181,48,42,.88)"; g.fillRect(x, gy+20, 3, 16);
+    g.font = `700 ${mobile?11:13}px "Noto Serif CJK SC",serif`; g.fillStyle = "rgba(27,28,31,.85)";
+    g.fillText(MON_CN[mo], x+7, gy+19);
+    g.font = `${mobile?9:10}px "Noto Serif CJK SC",serif`; g.fillStyle = "rgba(27,28,31,.6)";
+    g.fillText(MON_EN[mo]+" "+p.d.d.slice(0,4), x+7, gy+(mobile?33:35));
+  }
+  // foreground rocks and reeds (parallax 1.25)
+  const frW = W + maxPan*1.25, fr = mk(frW), fg = fr.g, rr = rng(99);
+  for (let x = 60 + rr()*120; x < frW; x += 520 + rr()*480){
+    const h = H*(.035 + rr()*.04), base = H*1.015;
+    mountain(fg, x, base, h, 50 + rr()*50, 5000 + (x|0), {est:false, alpha:.9});
+    if (rr() < .7) drawPine(fg, x + (rr()-.5)*20, base - h*.92, 18 + rr()*12, rr, false);
+    fg.strokeStyle = "rgba(24,25,28,.55)"; fg.lineWidth = .9;
+    for (let k=0;k<14;k++){ const rx = x + 40 + rr()*70, rh = 10 + rr()*26; fg.beginPath(); fg.moveTo(rx, base-2); fg.quadraticCurveTo(rx+3, base-rh*.6, rx+7*(rr()-.3), base-rh); fg.stroke(); }
+  }
+  // silk texture (screen space)
+  const sk = mk(W), sg = sk.g, sr = rng(5);
+  let gr = sg.createLinearGradient(0,0,0,H); gr.addColorStop(0,"#efe4ca"); gr.addColorStop(.7,"#e8dabb"); gr.addColorStop(1,"#e2d1ad");
+  sg.fillStyle = gr; sg.fillRect(0,0,W,H);
+  sg.globalAlpha = .05; sg.strokeStyle = "#6b5530";
+  for (let k=0;k<(W*H/900|0);k++){ const x=sr()*W,y=sr()*H; sg.lineWidth=.5; sg.beginPath(); sg.moveTo(x,y); sg.lineTo(x+sr()*14+4,y+(sr()-.5)); sg.stroke(); }
+  sg.globalAlpha = 1;
+  for (let k=0;k<7;k++){ const x=sr()*W,y=sr()*H,rad=40+sr()*160; const s=sg.createRadialGradient(x,y,0,x,y,rad); s.addColorStop(0,"rgba(150,110,50,.07)"); s.addColorStop(1,"rgba(150,110,50,0)"); sg.fillStyle=s; sg.fillRect(x-rad,y-rad,rad*2,rad*2); }
+  layers = {far, mid, fr, sk};
+  ripples = Array.from({length: mobile? 40 : 70}, () => ({x: Math.random()*W, y: gy + 44 + Math.random()*(H-gy-50), l: 10+Math.random()*40, s: 4+Math.random()*10}));
+  // start the pan near today when first built
+  pan = clamp(pan || maxPan, 0, maxPan);
+}
+
+/* ---------- boats ---------- */
+function drawBoat(x, y, s, col, name, amt, label, t){
+  const bob = Math.sin(t*1.3 + x*.02)*1.5;
+  ctx.save(); ctx.translate(x, y + bob);
+  // reflection
+  ctx.strokeStyle = "rgba(24,25,28,.18)"; ctx.lineWidth = 1;
+  for (let k=1;k<4;k++){ ctx.beginPath(); ctx.moveTo(-s*.7 + Math.sin(t*2+k)*3, 4+k*3); ctx.lineTo(s*.7 - k*4, 4+k*3); ctx.stroke(); }
+  // hull
+  ctx.fillStyle = "rgba(24,25,28,.9)";
+  ctx.beginPath(); ctx.moveTo(-s, -s*.12); ctx.quadraticCurveTo(-s*.3, s*.22, s*.15, s*.12); ctx.quadraticCurveTo(s*.7, s*.06, s*1.05, -s*.22); ctx.quadraticCurveTo(s*.5, -s*.02, -s, -s*.12); ctx.fill();
+  // canopy in the model's colour, washed into the ink
+  ctx.fillStyle = col; ctx.globalAlpha = .85;
+  ctx.beginPath(); ctx.moveTo(-s*.45, -s*.06); ctx.quadraticCurveTo(-s*.15, -s*.5, s*.25, -s*.08); ctx.closePath(); ctx.fill();
+  ctx.globalAlpha = 1; ctx.strokeStyle = "rgba(24,25,28,.85)"; ctx.lineWidth = 1; ctx.stroke();
+  // ferryman with hat and pole
+  ctx.beginPath(); ctx.moveTo(s*.55, -s*.1); ctx.lineTo(s*.6, -s*.42); ctx.stroke();
+  ctx.fillStyle = "rgba(24,25,28,.9)"; ctx.beginPath(); ctx.moveTo(s*.46, -s*.42); ctx.lineTo(s*.6, -s*.52); ctx.lineTo(s*.74, -s*.42); ctx.closePath(); ctx.fill();
+  ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(s*.85, -s*.8); ctx.lineTo(s*.35, s*.45); ctx.stroke();
+  if (label){
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.font = `700 ${W<600?10:12}px "Noto Serif CJK SC",serif`; ctx.fillStyle = "rgba(27,28,31,.92)";
+    ctx.fillText(name, 0, s*.3+4);
+    ctx.font = `${W<600?9:11}px "Noto Serif CJK SC",serif`; ctx.fillStyle = "rgba(27,28,31,.62)";
+    ctx.fillText(amt, 0, s*.3+(W<600?16:19));
+  }
+  ctx.restore();
+}
+
+/* ---------- frame ---------- */
+let last = performance.now(), raf = 0, T = 0;
+function frame(){
+  const now = performance.now();
+  const dt = Math.min(.05, (now - last)/1000); last = now; T += dt;
+  raf = requestAnimationFrame(frame);
+  if (!D || !layers) return;
+  // counter tween
+  const k = clamp((now - tStart)/2600, 0, 1), e = 1 - Math.pow(1-k, 3);
+  shown = tFrom + (tTo - tFrom)*e;
+  $("total").textContent = TB.full(shown);
+  const mil = Math.floor(shown/1e8);
+  if (lastMil >= 0 && mil > lastMil) milestone(); lastMil = mil;
+  // pan
+  if (!dragging && now > idleUntil && maxPan > 0){
+    pan += panDir * dt * (W<600? 14 : 20);
+    if (pan > maxPan){ pan = maxPan; panDir = -1 } if (pan < 0){ pan = 0; panDir = 1 }
+  }
+  const c = ctx; c.setTransform(DPR,0,0,DPR,0,0);
+  c.drawImage(layers.sk.c, 0, 0, W, H);
+  const gy = groundY();
+  c.drawImage(layers.far.c, -pan*.4*DPR, 0, W*DPR, H*DPR, 0, 0, W, H);
+  // drifting mist band between ranges
+  for (let i=0;i<3;i++){
+    const x = ((T*6*(i+1) + i*400) % (W+600)) - 300, y = gy - H*(.06 + i*.07);
+    const g = c.createRadialGradient(x, y, 0, x, y, 300); g.addColorStop(0,"rgba(239,229,206,.55)"); g.addColorStop(1,"rgba(239,229,206,0)");
+    c.save(); c.translate(x,y); c.scale(1,.18); c.translate(-x,-y); c.fillStyle = g; c.fillRect(x-300,y-300,600,600); c.restore();
+  }
+  c.drawImage(layers.mid.c, pan*DPR, 0, W*DPR, H*DPR, 0, 0, W, H);
+  // waterfall from today's peak
+  waterfall(c, dt, gy);
+  // low mist over the river bank
+  let g = c.createLinearGradient(0, gy-30, 0, gy+30); g.addColorStop(0,"rgba(239,229,206,0)"); g.addColorStop(.5,"rgba(239,229,206,.55)"); g.addColorStop(1,"rgba(239,229,206,0)");
+  c.fillStyle = g; c.fillRect(0, gy-30, W, 60);
+  // river ripples
+  c.strokeStyle = "rgba(60,70,72,.2)"; c.lineWidth = 1;
+  for (const r of ripples){ r.x -= r.s*dt*(.4+D.intensity); if (r.x < -60) r.x = W + 20;
+    c.beginPath(); c.moveTo(r.x, r.y); c.quadraticCurveTo(r.x + r.l*.5, r.y - 1.5, r.x + r.l, r.y); c.stroke(); }
+  c.drawImage(layers.fr.c, pan*1.25*DPR, 0, W*DPR, H*DPR, 0, 0, W, H);
+  // boats
+  const ms = D.models, mobile = W < 600, rows = mobile ? 3 : 2, top = gy + (mobile? 58 : 84), rowH = (H - top - (mobile? 22 : 34)) / rows;
+  const cols = Math.ceil(ms.length / rows);
+  ms.forEach((m, i) => {
+    const s = (mobile? 11 : 18) + Math.pow(m.share, .35)*(mobile? 20 : 34);
+    const row = i % rows, col = Math.floor(i / rows), cw = (W - 40) / cols;
+    const x = 20 + (col + .5 + (row % 2 ? .25 : -.1))*cw + Math.sin(T*.12 + i*1.7)*cw*.12;
+    const y = top + row*rowH + rowH*.25;
+    drawBoat(x, y, s, m.color, m.name, TB.fmt(m.tokens), true, T);
+  });
+  // geese
+  nextGeese -= dt; if (nextGeese < 0){ launchGeese(5 + (Math.random()*4|0)); nextGeese = 35 + Math.random()*30; }
+  c.strokeStyle = "rgba(24,25,28,.8)"; c.lineCap = "round";
+  for (let i = geese.length-1; i >= 0; i--){ const b = geese[i]; b.x += b.vx*dt; b.y += Math.sin(T*1.4 + b.p)*.08;
+    const f = Math.sin(T*7 + b.p)*.5 + .5, s = b.s; c.lineWidth = 1.3;
+    c.beginPath(); c.moveTo(b.x - s, b.y - s*(.2+f*.5)); c.quadraticCurveTo(b.x - s*.3, b.y - s*.1, b.x, b.y); c.quadraticCurveTo(b.x + s*.3, b.y - s*.1, b.x + s, b.y - s*(.2+f*.5)); c.stroke();
+    if (b.x < -40 || b.x > W + 40) geese.splice(i,1); }
+  // hover marker
+  if (hover >= 0){ const p = peaks[hover], x = p.x - pan;
+    c.fillStyle = "#b5302a"; c.beginPath(); c.arc(x, p.top - 8, 3.5, 0, Math.PI*2); c.fill();
+    c.strokeStyle = "rgba(181,48,42,.5)"; c.setLineDash([2,4]); c.beginPath(); c.moveTo(x, p.top-4); c.lineTo(x, gy+16); c.stroke(); c.setLineDash([]); }
+}
+function waterfall(c, dt, gy){
+  const p = peaks[peaks.length-1]; if (!p || !cliff || !cliff.pts) return;
+  const I = D.intensity, isToday = p.d.d === D.todayISO;
+  // the fall leaves the cliff's left shoulder, facing the day peaks
+  const idx = 41, sx = cliff.pts[idx][0] - pan, sy = cliff.pts[idx][1] + 10;
+  if (sx < -80 || sx > W + 80) return;
+  const width = 5 + 16*I, fallH = gy + 14 - sy, speed = 70 + 320*I;
+  c.save();
+  // white water with wavering ink-edged banks, two cascades
+  const yb = gy + 14, steps = 40, edge = (y, side) => {
+    const f = (y - sy)/fallH, wob = Math.sin(y*.09 + T*3*side) * 1.2 + Math.sin(y*.031 - T*2) * 1.6;
+    const ledge = f > .55 ? 1.25 : 1;                   // widens after the ledge
+    return sx + side*(width*.5*(.55 + .7*f)*ledge + wob);
+  };
+  c.beginPath();
+  for (let k=0;k<=steps;k++){ const y = sy + fallH*k/steps; c.lineTo(edge(y,-1), y); }
+  for (let k=steps;k>=0;k--){ const y = sy + fallH*k/steps; c.lineTo(edge(y,1), y); }
+  c.closePath();
+  let g = c.createLinearGradient(0, sy, 0, yb);
+  g.addColorStop(0, "rgba(247,242,230,.55)"); g.addColorStop(.12, "rgba(247,242,230,.96)"); g.addColorStop(.85, "rgba(247,242,230,.92)"); g.addColorStop(1, "rgba(247,242,230,.4)");
+  c.fillStyle = g; c.fill();
+  c.lineWidth = 1.1; c.strokeStyle = "rgba(24,25,28,.55)";
+  for (const side of [-1,1]){ c.beginPath(); for (let k=2;k<=steps-3;k++){ const y = sy + fallH*k/steps; if (Math.sin(k*1.7+side) > .75){ c.stroke(); c.beginPath(); continue } c.lineTo(edge(y,side) + side*.5, y); } c.stroke(); }
+  // a single dark boulder where the water breaks
+  const ly = sy + fallH*.55; c.fillStyle = "rgba(24,25,28,.7)";
+  c.beginPath(); c.ellipse(sx + width*.7 + 2, ly + 2, 3 + width*.25, 2.2, .35, 0, Math.PI*2); c.fill();
+  // falling streaks
+  c.strokeStyle = "rgba(60,72,78,.4)"; c.lineWidth = .8;
+  const nS = 3 + Math.round(8*I);
+  for (let k=0;k<nS;k++){
+    const off = ((T*speed + k*53) % (fallH+40)) - 20, xx = sx + (k/(nS-1||1) - .5)*width*.9;
+    c.beginPath(); c.moveTo(xx, sy + Math.max(0, off)); c.lineTo(xx + (off/fallH)*width*.25, sy + Math.min(fallH, off + 16 + 20*I)); c.stroke();
+  }
+  c.restore();
+  // spray at the base
+  const want = 10 + 50*I;
+  while (spray.length < want) spray.push({x: 0, y: 0, vx: (Math.random()-.5)*30*(1+I), vy: -Math.random()*20*(1+I), life: Math.random()});
+  for (const s of spray){ s.life += dt*(.6+I); if (s.life > 1){ s.life = 0; s.x = 0; s.y = 0; s.vx = (Math.random()-.5)*30*(1+I); s.vy = -Math.random()*22*(1+I); }
+    s.x += s.vx*dt; s.y += s.vy*dt; s.vy += 30*dt;
+    c.fillStyle = `rgba(246,240,226,${.8*(1-s.life)})`; c.beginPath(); c.arc(sx + s.x, gy + 14 + s.y, 2 + s.life*5, 0, Math.PI*2); c.fill(); }
+  c.font = `700 ${W<600?10:12}px "Noto Serif CJK SC",serif`; c.fillStyle = "rgba(181,48,42,.92)"; c.textAlign = "right"; c.textBaseline = "middle";
+  c.fillText("瀑 today's flow " + Math.round(I*100) + "%", sx - width - 8, sy + 10);
+  // mark today's peak
+  const tx = p.x - pan; c.fillStyle = "#b5302a"; c.fillRect(tx - 7, p.top - 40, 14, 14);
+  c.fillStyle = "#f2e2cc"; c.font = `900 10px "Noto Serif CJK SC",serif`; c.textAlign = "center"; c.fillText(isToday ? "今" : "末", tx, p.top - 33);
+  c.fillStyle = "rgba(27,28,31,.85)"; c.font = `700 ${W<600?10:11}px "Noto Serif CJK SC",serif`; c.fillText(TB.fmt(p.d.tokens), tx, p.top - 50);
+}
+function launchGeese(n){
+  const fromLeft = Math.random() < .5, y = H*(.12 + Math.random()*.16), vx = (fromLeft? 1 : -1)*(40 + Math.random()*20);
+  for (let i=0;i<n;i++){ const row = Math.ceil(i/2), side = i%2 ? 1 : -1;
+    geese.push({x: (fromLeft? -30 : W+30) - Math.sign(vx)*row*20, y: y + row*9*side*(i?1:0) + (i? row*4 : 0), vx, s: 5 + Math.random()*2, p: Math.random()*6}); }
+}
+function milestone(){
+  launchGeese(9);
+  const s = $("seal"); s.classList.remove("stamp"); void s.getBoundingClientRect(); s.classList.add("stamp");
+}
+
+/* ---------- interaction ---------- */
+silk.addEventListener("pointerdown", e => { dragging = true; dragX = e.clientX; dragPan = pan; silk.classList.add("drag"); silk.setPointerCapture(e.pointerId); });
+silk.addEventListener("pointermove", e => {
+  const r = silk.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  if (dragging){ pan = clamp(dragPan - (e.clientX - dragX), 0, maxPan); idleUntil = performance.now() + 4000; }
+  // nearest peak
+  let best = -1, bd = 1e9; const wx = mx + pan;
+  for (const p of peaks){ const d = Math.abs(p.x - wx); if (d < bd){ bd = d; best = p.i } }
+  const tip = $("tip");
+  if (best >= 0 && bd < 50 && my < groundY() + 40){
+    hover = best; const p = peaks[best], x = p.d;
+    tip.innerHTML = `<b>${TB.fmt(x.tokens)}</b> · ${fmtDate(x.d)}<br>${TB.full(x.tokens)} tokens${x.est? `<br><span style="color:#8a7f6e">${TB.fmt(x.est)} estimated</span>` : ""}<br><span style="color:#8a7f6e">${Object.entries(x.byModel).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>k+" "+TB.fmt(v)).join(" · ")}</span>`;
+    tip.style.opacity = 1; tip.style.left = clamp(mx + 14, 4, W - 210) + "px"; tip.style.top = clamp(my - 70, 4, H - 90) + "px";
+  } else { hover = -1; tip.style.opacity = 0; }
+});
+const endDrag = () => { dragging = false; silk.classList.remove("drag"); };
+silk.addEventListener("pointerup", endDrag); silk.addEventListener("pointercancel", endDrag);
+silk.addEventListener("pointerleave", () => { hover = -1; $("tip").style.opacity = 0; });
+window.addEventListener("resize", () => { clearTimeout(window._rs); window._rs = setTimeout(resize, 120); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) cancelAnimationFrame(raf); else { last = performance.now(); raf = requestAnimationFrame(frame); } });
+
+/* ---------- data ---------- */
+TB.onData(d => {
+  const first = !D; D = d;
+  tFrom = first ? d.total*0.985 : shown; tTo = d.total; tStart = performance.now();
+  if (!first && Math.floor(d.total/1e8) > Math.floor(tFrom/1e8)) {} // milestone fires from the tween
+  $("sealv").textContent = TB.fmt(d.total);
+  $("since").textContent = `tokens burned since ${fmtDate(d.firstDay)}`;
+  $("today").textContent = TB.fmt(d.today);
+  $("todayFull").textContent = TB.full(d.today) + " tokens · intensity " + Math.round(d.intensity*100) + "%";
+  $("week").textContent = TB.fmt(d.week);
+  $("ndays").textContent = d.days.length;
+  const mt = d.measured + d.estimated || 1;
+  $("splitBar").style.width = (d.measured/mt*100).toFixed(1) + "%";
+  $("meas").textContent = TB.fmt(d.measured); $("est").textContent = TB.fmt(d.estimated);
+  $("models").innerHTML = d.models.map(m => `<li><span class="dot" style="background:${m.color}"></span><span class="nm">${m.name}</span><span class="tk">${TB.fmt(m.tokens)}</span><span class="sh">${m.share >= .001 ? (m.share*100).toFixed(1) : "<0.1"}%</span></li>`).join("");
+  $("fallTxt").textContent = `Its flow is today's intensity: ${Math.round(d.intensity*100)}% (${TB.fmt(d.today)} today). The tallest peak, ${TB.fmt(d.maxDay)}, was the biggest day.`;
+  $("demo").textContent = d.demo ? "SAMPLE DATA · server not reachable" : "";
+  $("inscr").innerHTML = `<div>代幣焚燒山水圖</div><div class="small">總計${cnNum(d.total)}</div><div class="small">今日${cnNum(d.today)}</div><span class="mini">印</span>`;
+  const s = d.days.map(x => x.d + x.tokens).join("|") + d.models.length;
+  if (s !== sig || first){ sig = s; if (W) build(); }
+});
+resize();
+raf = requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

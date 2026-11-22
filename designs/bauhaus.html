@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bauhaus Poster</title>
+<meta name="description" content="A Bauhaus and Swiss modernist poster: the total in huge grid-set numerals, today as a red disc against the biggest-day ring, models as circles on a constructivist diagonal, and every day as a bar in a rhythmic row, all sliding crisply into place.">
+<style>
+:root{--paper:#efe9dc;--paper2:#e6dfcf;--ink:#111;--red:#d4302a;--blue:#1d4ea0;--yellow:#f2b705;--grey:#8a857c;--rule:3px}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--paper);color:var(--ink);font-family:"Nimbus Sans","Liberation Sans","Helvetica Neue",Arial,sans-serif;overflow-x:hidden}
+.poster{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:auto auto minmax(0,1fr) minmax(150px,27vh);column-gap:16px;row-gap:14px;height:100vh;padding:24px 30px 20px;overflow:hidden}
+.deco{position:absolute;pointer-events:none;z-index:0}
+.poster>section,.poster>header{position:relative;z-index:1;min-width:0}
+/* slide-in */
+.in{opacity:0;transform:translateX(-60px);transition:transform .9s cubic-bezier(.7,0,.15,1),opacity .5s}
+.in.r{transform:translateX(60px)}.in.u{transform:translateY(60px)}
+.go .in{opacity:1;transform:none}
+header{grid-column:1/13;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:var(--rule) solid var(--ink);padding-bottom:8px}
+.mast{display:flex;align-items:baseline;gap:14px}
+.mast b{font-size:22px;font-weight:700;letter-spacing:.02em}
+.mast span{font-size:12px;letter-spacing:.24em;text-transform:uppercase}
+.meta{font-size:12px;letter-spacing:.16em;text-transform:uppercase;text-align:right;white-space:nowrap}
+.meta i{font-style:normal;display:inline-block;width:10px;height:10px;background:var(--red);border-radius:50%;margin-left:8px;vertical-align:-1px}
+.totalbox{grid-column:1/10;align-self:end;overflow:hidden;position:relative}
+.lbl{font-size:11px;letter-spacing:.24em;text-transform:uppercase;font-weight:700}
+.lbl em{font-style:normal;font-weight:400;color:var(--grey)}
+.total{font-weight:700;line-height:.86;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap;margin:6px 0 4px;font-size:120px}
+.total .c{color:var(--red)}
+.under{display:flex;gap:22px;align-items:center;font-size:13px;letter-spacing:.06em}
+.under .bar{height:10px;flex:1;background:var(--ink);position:relative;overflow:hidden}
+.under .bar:after{content:"";position:absolute;left:-30%;top:0;bottom:0;width:30%;background:var(--yellow);animation:sweep 3.2s cubic-bezier(.7,0,.3,1) infinite}
+@keyframes sweep{to{left:100%}}
+.side{grid-column:10/13;grid-row:2/4;display:flex;flex-direction:column;gap:14px;min-height:0}
+.disc{position:relative;flex:1 1 auto;min-height:170px}
+.disc svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.stat{display:grid;grid-template-columns:1fr 1fr;border-top:var(--rule) solid var(--ink)}
+.stat>div{padding:8px 0 0}
+.stat>div+div{border-left:1px solid var(--ink);padding-left:12px}
+.num{font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1.05}
+.small{font-size:11px;color:var(--grey);font-variant-numeric:tabular-nums}
+.split{display:flex;height:34px;margin:8px 0 6px;border:var(--rule) solid var(--ink)}
+.split .m{background:var(--ink);transition:flex 1.2s cubic-bezier(.7,0,.15,1) .8s}
+.split .e{background:repeating-linear-gradient(-45deg,var(--ink) 0 2px,transparent 2px 7px);transition:flex 1.2s}
+.splitl{display:flex;justify-content:space-between;font-size:12px;gap:8px}
+.splitl b{font-size:15px}
+.comp{grid-column:1/6;grid-row:3;min-height:0;position:relative}
+.comp svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.table{grid-column:6/10;grid-row:3;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.table ol{list-style:none;margin:6px 0 0;padding:0;border-top:var(--rule) solid var(--ink);flex:1;min-height:0;overflow:auto}
+.table li{display:grid;grid-template-columns:22px 14px minmax(0,1fr) 62px 44px;gap:8px;align-items:center;font-size:13px;height:min(26px,calc((100% - 0px)/10));min-height:20px;border-bottom:1px solid rgba(17,17,17,.18);position:relative}
+.table li .k{font-size:10px;color:var(--grey);font-variant-numeric:tabular-nums}
+.table li .sw{width:12px;height:12px}
+.table li .nm{font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;position:relative;z-index:1}
+.table li .lg{position:absolute;left:44px;bottom:2px;height:3px;background:currentColor;opacity:.9;transform-origin:left;transform:scaleX(0);transition:transform 1s cubic-bezier(.7,0,.15,1)}
+.go .table li .lg{transform:scaleX(1)}
+.table li .tk{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.table li .sh{text-align:right;font-size:11px;color:var(--grey);font-variant-numeric:tabular-nums}
+.days{grid-column:1/13;grid-row:4;position:relative;min-height:0;border-top:var(--rule) solid var(--ink);padding-top:6px;display:flex;flex-direction:column}
+.days .hd{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.days .key{font-size:11px;letter-spacing:.1em;text-transform:uppercase;display:flex;gap:14px;flex-wrap:wrap}
+.days .key span:before{content:"";display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;background:var(--k)}
+.days .wrapsvg{position:relative;flex:1;min-height:0}
+.days svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--paper);padding:7px 10px;font-size:12px;line-height:1.4;white-space:nowrap;opacity:0;transition:opacity .12s;z-index:5}
+.tip b{font-size:15px;color:var(--yellow)}
+.flash{position:absolute;left:0;top:0;height:100%;width:22%;background:var(--yellow);mix-blend-mode:multiply;transform:translateX(-110%);pointer-events:none}
+.flash.on{animation:fl 1.1s cubic-bezier(.7,0,.3,1)}
+@keyframes fl{to{transform:translateX(560%)}}
+.demo{position:absolute;right:30px;bottom:4px;font-size:10px;letter-spacing:.2em;color:var(--red);z-index:2}
+@media (max-width:760px){
+  .poster{display:flex;flex-direction:column;height:auto;padding:16px;gap:18px;overflow:visible}
+  header{flex-wrap:wrap}
+  .totalbox{align-self:stretch}
+  .meta{text-align:left;white-space:normal}
+  .side{order:2}
+  .disc{min-height:250px;flex:none}
+  .comp{order:3;height:300px;flex:none}
+  .table{order:4}
+  .table ol{overflow:visible}
+  .table li{height:28px}
+  .days{order:5;height:240px;flex:none}
+  .deco.hideM{display:none}
+}
+</style>
+</head>
+<body>
+<div class="poster" id="poster">
+  <!-- decorative constructivist shapes -->
+  <svg class="deco hideM" id="deco" style="inset:0;width:100%;height:100%"></svg>
+  <header class="in">
+    <div class="mast"><b>Token Burn</b><span>Verbrannte Tokens · No. <span id="no">—</span></span></div>
+    <div class="meta"><span id="range">—</span><i></i></div>
+  </header>
+  <section class="totalbox in" id="totalbox">
+    <div class="lbl">Total tokens burned <em>/ Gesamt</em></div>
+    <div class="total" id="total">0</div>
+    <div class="under"><span id="since">—</span><div class="bar"></div><span id="pct">—</span></div>
+    <div class="flash" id="flash"></div>
+  </section>
+  <section class="side in r">
+    <div class="disc" id="disc"><svg id="discsvg"></svg></div>
+    <div class="stat">
+      <div><div class="lbl">This week</div><div class="num" id="week">—</div><div class="small" id="weekf"></div></div>
+      <div><div class="lbl">Days</div><div class="num" id="ndays">—</div><div class="small" id="peak"></div></div>
+    </div>
+    <div>
+      <div class="lbl">Measured <em>/ estimated</em></div>
+      <div class="split"><div class="m" id="sm" style="flex:1"></div><div class="e" id="se" style="flex:1"></div></div>
+      <div class="splitl"><div><b id="meas">—</b> measured</div><div style="text-align:right"><b id="est">—</b> estimated</div></div>
+    </div>
+  </section>
+  <section class="comp in u" id="comp"><svg id="compsvg"></svg></section>
+  <section class="table in u">
+    <div class="lbl">Models <em>/ circle area = share, line = log size</em></div>
+    <ol id="models"></ol>
+  </section>
+  <section class="days in u">
+    <div class="hd"><div class="lbl">Day by day <em>/ Tag für Tag</em></div>
+      <div class="key"><span style="--k:var(--ink)">counted</span><span style="--k:repeating-linear-gradient(-45deg,#111 0 2px,transparent 2px 4px)">estimated</span><span style="--k:var(--blue)">biggest day</span><span style="--k:var(--red)">today</span></div></div>
+    <div class="wrapsvg" id="dayswrap"><svg id="dayssvg"></svg></div>
+  </section>
+  <div class="demo" id="demo"></div>
+</div>
+<div class="tip" id="tip"></div>
+<script>if(/[?&]still=1/.test(location.search))document.write('<style>*,*:before,*:after{transition:none!important;animation-duration:0s!important}</style>')</script>
+<script src="tb-data.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id), NS = "http://www.w3.org/2000/svg";
+const PAL = ["#d4302a","#1d4ea0","#f2b705","#111111","#8a857c","#e0762b","#2b7a4b","#7d8fb0","#5a3f8c","#c7b48f","#6b6b6b","#a03a6b"];
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtDate = s => { const [y,m,d] = s.split("-"); return +d + " " + MON[+m-1] + " " + y; };
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+let D = null, colorOf = {}, shown = 0, tFrom = 0, tTo = 0, tStart = 0, lastMil = -1, started = false;
+let discAngle = 0, raf = 0, last = performance.now();
+
+function el(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function box(id){ const r = $(id).getBoundingClientRect(); return {w: Math.max(10, r.width), h: Math.max(10, r.height)}; }
+
+/* ---------- huge numerals fitted to the grid ---------- */
+function fitTotal(){
+  const t = $("total"), tb = $("totalbox"); t.style.fontSize = "100px";
+  const w = t.scrollWidth, avail = tb.clientWidth;
+  const maxH = innerWidth < 760 ? 200 : innerHeight*.22;
+  t.style.fontSize = Math.min(maxH, avail/w*100*.995) + "px";
+}
+function renderTotal(v){
+  // commas in red: the grid's punctuation
+  $("total").innerHTML = TB.full(v).replace(/,/g, '<span class="c">,</span>');
+}
+
+/* ---------- decorative shapes ---------- */
+function drawDeco(){
+  const s = $("deco"); s.innerHTML = ""; const W = innerWidth, H = innerHeight;
+  if (W < 760) return;
+  el("circle", {cx: W - 40, cy: 46, r: 120, fill: "#1d4ea0", opacity: .1}, s);
+  el("rect", {x: W*.415, y: H*.36, width: 7, height: H*.42, fill: "#111", transform: `rotate(28 ${W*.415} ${H*.36})`, opacity: .08}, s);
+  el("polygon", {points: `${W*.44},${H*.73} ${W*.6},${H*.73} ${W*.52},${H*.56}`, fill: "#f2b705", opacity: .16}, s);
+}
+
+/* ---------- today disc ---------- */
+let discParts = null;
+function drawDisc(){
+  const s = $("discsvg"); s.innerHTML = ""; const {w, h} = box("disc");
+  const R = Math.min(w, h - 16)/2 - 6, cx = w/2, cy = h/2 + 8;
+  const ratio = Math.sqrt(clamp(D.today/D.maxDay, 0, 1)), r = Math.max(R*.16, R*.92*ratio);
+  // biggest-day ring and quarter-grid
+  el("line", {x1: cx - R - 4, y1: cy, x2: cx + R + 4, y2: cy, stroke: "#111", "stroke-width": 1}, s);
+  el("line", {x1: cx, y1: cy - R - 4, x2: cx, y2: cy + R + 4, stroke: "#111", "stroke-width": 1}, s);
+  el("circle", {cx, cy, r: R*.92, fill: "none", stroke: "#111", "stroke-width": 3}, s);
+  // yellow half disc that rotates with today's intensity
+  const orbit = el("g", {}, s);
+  el("path", {d: `M ${cx - R*.92} ${cy} A ${R*.92} ${R*.92} 0 0 1 ${cx + R*.92} ${cy} Z`, fill: "#f2b705"}, orbit);
+  const disc = el("circle", {cx, cy, r: 0, fill: "#d4302a"}, s);
+  const sm = el("circle", {cx: cx + R*.92, cy, r: 9, fill: "#1d4ea0"}, s);
+  const big = r > R*.42;
+  const t1 = el("text", {x: cx, y: big ? cy - 4 : cy + r + 26, "text-anchor": "middle", "font-size": 12, "font-weight": 700, "letter-spacing": "2.5", fill: big ? "#efe9dc" : "#111"}, s); t1.textContent = "TODAY / HEUTE";
+  const t2 = el("text", {x: cx, y: big ? cy + 30 : cy + r + 56, "text-anchor": "middle", "font-size": Math.min(40, Math.max(26, r*.42)), "font-weight": 700, fill: big ? "#efe9dc" : "#111"}, s); t2.textContent = TB.fmt(D.today);
+  if (!big){ t1.setAttribute("paint-order","stroke"); t1.setAttribute("stroke","#efe9dc"); t1.setAttribute("stroke-width","4"); t2.setAttribute("paint-order","stroke"); t2.setAttribute("stroke","#efe9dc"); t2.setAttribute("stroke-width","5"); }
+  const t3 = el("text", {x: cx - R*.92, y: cy - R*.92 - 8, "font-size": 10, "letter-spacing": "1.5", fill: "#111"}, s); t3.textContent = "RING = BIGGEST DAY " + TB.fmt(D.maxDay);
+  discParts = {disc, r, orbit, sm, cx, cy, R: R*.92};
+}
+
+/* ---------- models on a constructivist diagonal ---------- */
+function drawComp(){
+  const s = $("compsvg"); s.innerHTML = ""; const {w, h} = box("comp");
+  const ms = D.models, Rmax = Math.min(w*(w < 500 ? .26 : .34), h*.42);
+  const rs = ms.map(m => Math.max(4, Rmax*Math.sqrt(m.share)));
+  // diagonal axis from the lower-left to upper-right
+  const x0 = Rmax*1.05, y0 = h - Rmax*1.1, x1 = w - 12, y1 = 14, ang = Math.atan2(y1 - y0, x1 - x0);
+  const axis = el("line", {x1: x0, y1: y0, x2: x0, y2: y0, stroke: "#111", "stroke-width": 6}, s);
+  setTimeout(() => { axis.setAttribute("x2", x1); axis.setAttribute("y2", y1); }, 20);
+  axis.style.transition = "all 1s cubic-bezier(.7,0,.15,1)";
+  // a blue block tucked behind the big disc, a black baseline under it
+  el("rect", {x: x0 - Rmax*1.0, y: y0 - Rmax*1.05, width: Rmax*.95, height: Rmax*.95, fill: "#1d4ea0"}, s);
+  el("rect", {x: x0 - Rmax*.95, y: y0 + Rmax*.98, width: Rmax*2.4, height: 6, fill: "#111"}, s);
+  let d = 0; const L = Math.hypot(x1 - x0, y1 - y0);
+  const span = rs.reduce((a,b) => a + b*2, 0) - rs[0] - rs[rs.length-1];
+  const gap = Math.max(3, (L - span - 16)/Math.max(1, ms.length - 1));
+  ms.forEach((m, i) => {
+    const r = rs[i]; if (i) d += (i === 1 ? rs[0] : 0) + gap + r;
+    const cx = x0 + Math.cos(ang)*d, cy = y0 + Math.sin(ang)*d;
+    const g = el("g", {class: "mc"}, s);
+    g.style.transition = `transform .8s cubic-bezier(.7,0,.15,1) ${(.4 + i*.07).toFixed(2)}s, opacity .4s ${(.4 + i*.07).toFixed(2)}s`;
+    g.style.transformOrigin = `${cx}px ${cy}px`; g.style.transform = "scale(0)"; g.style.opacity = 0;
+    el("circle", {cx, cy, r, fill: colorOf[m.name], stroke: i === 3 ? "#efe9dc" : "none", "stroke-width": 2}, g);
+    if (i === 0){
+      const t = el("text", {x: cx, y: cy - 4, "text-anchor": "middle", "font-size": Math.max(12, r*.2), "font-weight": 700, fill: "#efe9dc", "letter-spacing": "1"}, g); t.textContent = m.name.toUpperCase();
+      const t2 = el("text", {x: cx, y: cy + Math.max(14, r*.22), "text-anchor": "middle", "font-size": Math.max(11, r*.16), fill: "#efe9dc"}, g); t2.textContent = (m.share*100).toFixed(1) + "%";
+    } else {
+      // leader perpendicular to the axis, alternating sides
+      const side = i % 2 ? 1 : -1, nx = -Math.sin(ang)*side, ny = Math.cos(ang)*side, len = r + 10 + (i%4 > 1 ? 22 : 0);
+      el("line", {x1: cx + nx*r, y1: cy + ny*r, x2: cx + nx*len, y2: cy + ny*len, stroke: "#111", "stroke-width": 1}, g);
+      const t = el("text", {x: cx + nx*(len + 3), y: cy + ny*(len + 3) + 4, "text-anchor": nx > 0 ? "start" : "end", "font-size": 10.5, "font-weight": 700, "letter-spacing": ".8", fill: "#111"}, g);
+      t.textContent = i < 5 ? m.name.toUpperCase() : String(i+1).padStart(2,"0");
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => { g.style.transform = "scale(1)"; g.style.opacity = 1; }));
+  });
+}
+
+/* ---------- day-by-day rhythm ---------- */
+let dayBars = [];
+function drawDays(){
+  const s = $("dayssvg"); s.innerHTML = ""; const {w, h} = box("dayswrap");
+  const days = D.days, n = days.length, labH = 18, top = 18, ch = h - labH - top, pitch = w/Math.max(1, n), bw = Math.max(1.5, pitch*.72);
+  const defs = el("defs", {}, s), pat = el("pattern", {id: "hatch", width: 5, height: 5, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)"}, defs);
+  el("rect", {width: 2, height: 5, fill: "#111"}, pat);
+  // alternating week bands for rhythm
+  let maxI = 0; days.forEach((x, i) => { if (x.tokens > days[maxI].tokens) maxI = i; });
+  const t0 = n ? new Date(days[0].d + "T00:00").getTime() : 0;
+  dayBars = [];
+  let lastM = "";
+  days.forEach((x, i) => {
+    const bh = Math.max(2, ch*Math.sqrt(x.tokens/D.maxDay)), bx = i*pitch + (pitch - bw)/2, by = top + ch - bh;
+    const wk = Math.floor((new Date(x.d + "T00:00").getTime() - t0)/864e5/7);
+    if (wk % 2 === 0) el("rect", {x: i*pitch, y: top + ch + 3, width: pitch + .5, height: 4, fill: "#f2b705"}, s);
+    const isToday = x.d === D.todayISO, isMax = i === maxI, est = x.est > x.tokens*.5;
+    const fill = isToday ? "#d4302a" : isMax ? "#1d4ea0" : est ? "url(#hatch)" : "#111";
+    const r = el("rect", {x: bx, y: top + ch, width: bw, height: 0, fill}, s);
+    if (est && !isToday && !isMax) el("rect", {x: bx + .5, y: by + .5, width: Math.max(.5, bw - 1), height: Math.max(.5, bh - 1), fill: "none", stroke: "#111", "stroke-width": 1}, s);
+    r.style.transition = `y .7s cubic-bezier(.7,0,.15,1) ${(.6 + i*.012).toFixed(3)}s, height .7s cubic-bezier(.7,0,.15,1) ${(.6 + i*.012).toFixed(3)}s`;
+    dayBars.push({r, by, bh, x: bx, w: bw, d: x});
+    const m = x.d.slice(0, 7);
+    if (m !== lastM){ lastM = m; const tx = el("text", {x: i*pitch + 1, y: h - 2, "font-size": 10.5, "font-weight": 700, "letter-spacing": "1.5", fill: "#111"}, s); tx.textContent = MON[+x.d.slice(5,7)-1].toUpperCase();
+      el("rect", {x: i*pitch, y: top + ch + 3, width: 2, height: 10, fill: "#111"}, s); }
+    if (isMax || isToday){ const t = el("text", {x: Math.min(w - 4, Math.max(4, bx + bw/2)), y: by - 5, "text-anchor": i > n - 4 ? "end" : "middle", "font-size": 11, "font-weight": 700, fill: isToday ? "#d4302a" : "#1d4ea0", "paint-order": "stroke", stroke: "#efe9dc", "stroke-width": 4}, s); t.textContent = TB.fmt(x.tokens); }
+  });
+  requestAnimationFrame(() => requestAnimationFrame(() => dayBars.forEach(b => { b.r.setAttribute("y", b.by); b.r.setAttribute("height", b.bh); b.r.style.y = b.by + "px"; b.r.style.height = b.bh + "px"; })));
+}
+$("dayswrap").addEventListener("pointermove", e => {
+  const r = $("dayswrap").getBoundingClientRect(), mx = e.clientX - r.left, tip = $("tip");
+  let best = null, bd = 1e9; for (const b of dayBars){ const d = Math.abs(b.x + b.w/2 - mx); if (d < bd){ bd = d; best = b; } }
+  if (!best){ tip.style.opacity = 0; return; }
+  const x = best.d;
+  tip.innerHTML = `<b>${TB.fmt(x.tokens)}</b> ${fmtDate(x.d)}<br>${TB.full(x.tokens)} tokens${x.est ? " · " + TB.fmt(x.est) + " estimated" : ""}<br>${Object.entries(x.byModel).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>k+" "+TB.fmt(v)).join(" · ")}`;
+  tip.style.opacity = 1; tip.style.left = clamp(e.clientX + 12, 4, innerWidth - 240) + "px"; tip.style.top = (e.clientY - 70) + "px";
+});
+$("dayswrap").addEventListener("pointerleave", () => $("tip").style.opacity = 0);
+
+/* ---------- model table ---------- */
+function drawTable(){
+  const lmax = Math.log10(D.models[0] ? D.models[0].tokens : 10);
+  $("models").innerHTML = D.models.map((m, i) => `<li style="color:${colorOf[m.name]}"><span class="k">${String(i+1).padStart(2,"0")}</span><span class="sw" style="background:${colorOf[m.name]};${i===3?"outline:1px solid #111":""}"></span><span class="nm" style="color:#111">${m.name}</span><span class="tk" style="color:#111">${TB.fmt(m.tokens)}</span><span class="sh">${m.share >= .001 ? (m.share*100).toFixed(1) : "<0.1"}%</span><span class="lg" style="width:calc((100% - 160px)*${(Math.max(0, Math.log10(m.tokens) - 5)/(lmax - 5)).toFixed(3)});transition-delay:${(.8 + i*.06).toFixed(2)}s"></span></li>`).join("");
+}
+
+/* ---------- animation loop ---------- */
+function frame(){
+  const now = performance.now(), dt = Math.min(.05, (now - last)/1000); last = now;
+  raf = requestAnimationFrame(frame);
+  if (!D) return;
+  const k = clamp((now - tStart)/2400, 0, 1), e = 1 - Math.pow(1 - k, 4);
+  const v = tFrom + (tTo - tFrom)*e;
+  if (Math.round(v) !== Math.round(shown)){ shown = v; renderTotal(v); }
+  const mil = Math.floor(shown/1e8); if (lastMil >= 0 && mil > lastMil) milestone(); lastMil = mil;
+  if (discParts){
+    const p = discParts, I = D.intensity;
+    discAngle += dt*(6 + 70*I);
+    p.orbit.setAttribute("transform", `rotate(${discAngle.toFixed(2)} ${p.cx} ${p.cy})`);
+    const a = (discAngle*2.2)*Math.PI/180; p.sm.setAttribute("cx", p.cx + Math.cos(a)*p.R); p.sm.setAttribute("cy", p.cy + Math.sin(a)*p.R);
+    const grow = clamp((now - tStart - 500)/900, 0, 1), ge = grow < 1 ? 1 - Math.pow(1 - grow, 3) : 1;
+    p.disc.setAttribute("r", (p.r*ge*(1 + .015*Math.sin(now/1000*(2 + 6*I)))).toFixed(2));
+  }
+}
+function milestone(){ const f = $("flash"); f.classList.remove("on"); void f.offsetWidth; f.classList.add("on"); }
+
+function layout(){
+  if (!D) return;
+  fitTotal(); drawDeco(); drawDisc(); drawComp(); drawDays();
+}
+let rt = 0, lastW = 0; const relayout = () => { clearTimeout(rt); rt = setTimeout(layout, 100); };
+window.addEventListener("resize", relayout);
+new ResizeObserver(() => { const w = $("poster").clientWidth; if (w !== lastW){ lastW = w; relayout(); } }).observe($("poster"));
+document.addEventListener("visibilitychange", () => { if (document.hidden) cancelAnimationFrame(raf); else { last = performance.now(); raf = requestAnimationFrame(frame); } });
+
+TB.onData(d => {
+  const first = !D; D = d;
+  colorOf = {}; d.models.forEach((m, i) => colorOf[m.name] = PAL[i % PAL.length]);
+  tFrom = first ? d.total*.985 : shown; tTo = d.total; tStart = performance.now(); if (first){ shown = tFrom; renderTotal(tFrom); }
+  $("no").textContent = d.days.length;
+  $("range").textContent = fmtDate(d.firstDay) + " — " + fmtDate(d.todayISO);
+  $("since").textContent = "since " + fmtDate(d.firstDay);
+  $("pct").textContent = TB.fmt(d.total) + " · " + Math.round(d.intensity*100) + "% today";
+  $("week").textContent = TB.fmt(d.week); $("weekf").textContent = TB.full(d.week);
+  $("ndays").textContent = d.days.length; $("peak").textContent = "peak " + TB.fmt(d.maxDay);
+  const mt = (d.measured + d.estimated) || 1;
+  $("sm").style.flex = String(d.measured/mt); $("se").style.flex = String(d.estimated/mt);
+  $("meas").textContent = TB.fmt(d.measured); $("est").textContent = TB.fmt(d.estimated);
+  $("demo").textContent = d.demo ? "SAMPLE DATA" : "";
+  drawTable(); layout();
+  if (!started){ started = true; requestAnimationFrame(() => requestAnimationFrame(() => $("poster").classList.add("go"))); }
+});
+raf = requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

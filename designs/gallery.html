@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Burn Designs</title>
+<style>
+:root{--bg:#05070d;--panel:#0b101b;--line:#1c2638;--text:#e8f1ff;--muted:#7d8ba3;--cyan:#7cf3ff}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 50% -10%,#0d1a2e 0%,var(--bg) 55%);color:var(--text);font:14px/1.45 system-ui,sans-serif;padding:26px 16px 60px;min-height:100vh}
+.wrap{max-width:1400px;margin:0 auto}
+h1{font-size:19px;margin:0 0 4px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+h1 span{color:var(--cyan)}
+.sub{color:var(--muted);margin:0 0 20px;font-size:13px}
+.sub a{color:var(--cyan)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:18px}
+@media (max-width:460px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.card:hover{border-color:var(--cyan)}
+.view{position:relative;aspect-ratio:16/10;overflow:hidden;background:#000}
+.view iframe{position:absolute;left:0;top:0;width:300%;height:300%;border:0;transform:scale(.3334);transform-origin:0 0;pointer-events:none}
+.view a{position:absolute;inset:0}
+.meta{padding:10px 14px 12px}
+.meta b{font-size:14px}
+.meta p{margin:3px 0 0;color:var(--muted);font-size:12px}
+.meta .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.meta .row a{color:var(--cyan);font-size:12px;text-decoration:none;white-space:nowrap}
+.empty{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Token <span>Burn</span> designs</h1>
+  <p class="sub">Every design shows the same live numbers from this computer's logs. Click one to open it full size. The current dashboard is <a href="/">here</a>. New designs show up on their own. Plus <a href="/designs/remix-browse.html">1,000 generated remixes ↗</a> (anime, art, creative, standard).</p>
+  <div class="grid" id="grid"><div class="empty">Loading…</div></div>
+</div>
+<script>
+const seen=new Set();
+async function load(){
+  let list=[];
+  try{list=await (await fetch("/api/designs",{cache:"no-store"})).json()}catch(e){}
+  const g=document.getElementById("grid");
+  if(!list.length){g.innerHTML='<div class="empty">No designs yet — they are being made.</div>';return}
+  if(!seen.size)g.innerHTML="";
+  for(const d of list){
+    if(seen.has(d.file))continue;seen.add(d.file);
+    const c=document.createElement("div");c.className="card";
+    const esc=s=>String(s).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+    c.innerHTML=`<div class="view"><iframe loading="lazy" data-src="/designs/${d.file}" title="${esc(d.title)}"></iframe><a href="/designs/${d.file}" target="_blank" aria-label="Open ${esc(d.title)}"></a></div>
+      <div class="meta"><div class="row"><b>${esc(d.title)}</b><a href="/designs/${d.file}" target="_blank">open ↗</a></div><p>${esc(d.about)}</p></div>`;
+    g.appendChild(c);io.observe(c.querySelector("iframe"));
+  }
+}
+/* only run previews that are on screen, so 16 animations don't all burn the GPU */
+const io=new IntersectionObserver(es=>{for(const e of es){const f=e.target;
+  if(e.isIntersecting){if(!f.src||f.src==="about:blank")f.src=f.dataset.src}
+  else if(f.src&&f.src!=="about:blank")f.src="about:blank"}},{rootMargin:"200px"});
+load();setInterval(load,15000);
+</script>
+</body>
+</html>

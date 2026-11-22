@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remix Browser</title>
+<meta name="description" content="Page through all 1000 generated designs">
+<style>
+:root{--bg:#0b0d12;--panel:#12151d;--line:#232836;--text:#eef1f7;--mut:#9aa3b5;--acc:#ffb547;--anime:#ff8fc8;--art:#e8c27a;--creative:#5ee6ff;--standard:#9fb4ff}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:radial-gradient(ellipse at 20% -10%,#1b1f2e 0%,var(--bg) 60%) fixed,var(--bg);color:var(--text);font:14px/1.45 Ubuntu,"Segoe UI",system-ui,sans-serif;min-height:100vh}
+.wrap{max-width:1480px;margin:0 auto;padding:22px 16px 60px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:16px}
+h1{margin:0;font:700 26px/1.1 "URW Gothic","Century Gothic",Ubuntu,sans-serif;letter-spacing:-.01em}
+h1 span{background:linear-gradient(90deg,var(--anime),var(--art),var(--creative),var(--standard));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--mut);margin:6px 0 0;font-size:13px;max-width:70ch}
+.sub a{color:var(--acc)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.btn{font:600 13px Ubuntu,system-ui,sans-serif;color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;text-decoration:none;line-height:1.1}
+button:hover,.btn:hover{border-color:var(--acc)}
+button:disabled{opacity:.4;cursor:default}
+.surprise{background:linear-gradient(90deg,#ff8fc8,#ffb547);color:#1a1020;border:0}
+input[type=search]{font:13px Ubuntu,system-ui,sans-serif;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:9px;padding:8px 12px;width:200px}
+.bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin:6px 0 16px;position:sticky;top:0;z-index:5;padding:10px 0;background:linear-gradient(var(--bg) 70%,transparent)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tab{border-radius:99px;padding:7px 13px}
+.tab[aria-selected=true]{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tab i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:0}
+.tab small{font-weight:500;opacity:.7;margin-left:4px}
+.pager{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:13px}
+.pager input{width:52px;font:600 13px Ubuntu,sans-serif;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px;text-align:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .2s,transform .2s}
+.card:hover{border-color:var(--acc);transform:translateY(-2px)}
+.view{position:relative;aspect-ratio:13/8;overflow:hidden}
+.view .ph{position:absolute;inset:0;display:grid;place-items:center;font:600 12px Ubuntu,sans-serif;letter-spacing:.12em;text-transform:uppercase}
+.view iframe{position:absolute;left:0;top:0;width:1300px;height:800px;border:0;transform-origin:0 0;pointer-events:none;opacity:0;transition:opacity .4s}
+.view iframe.on{opacity:1}
+.view a{position:absolute;inset:0;z-index:2}
+.meta{padding:10px 13px 12px;display:flex;flex-direction:column;gap:3px}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.row b{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row a{color:var(--acc);font-size:12px;text-decoration:none;white-space:nowrap}
+.tags{color:var(--mut);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-block;font:700 10px Ubuntu,sans-serif;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:99px;color:#111;margin-right:6px;vertical-align:1px}
+.empty{color:var(--mut);padding:40px 0;text-align:center}
+.foot{display:flex;justify-content:center;margin-top:22px}
+@media (max-width:640px){
+  h1{font-size:22px}
+  input[type=search]{width:100%}
+  .tools{width:100%}
+  .grid{grid-template-columns:1fr}
+  .bar{position:static}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Remix <span>Browser</span></h1>
+      <p class="sub" id="sub">Loading the catalogue…</p>
+    </div>
+    <div class="tools">
+      <input type="search" id="q" placeholder="Filter: name, palette, scene…" aria-label="Filter designs">
+      <button class="surprise" id="surprise" title="Open a random design from this filter">Surprise me</button>
+      <a class="btn" href="gallery.html">Gallery</a>
+    </div>
+  </header>
+  <div class="bar">
+    <div class="tabs" id="tabs" role="tablist"></div>
+    <div class="pager"><button id="prev" aria-label="Previous page">‹ Prev</button><span>Page <input id="pg" inputmode="numeric" aria-label="Page"> / <b id="pages">1</b></span><button id="next" aria-label="Next page">Next ›</button></div>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="foot"><button id="next2">Next page ›</button></div>
+</div>
+<iframe id="cat" src="remix.html?catalog=1" style="display:none" title="catalogue"></iframe>
+<script>
+"use strict";
+const PER = 24;
+const GEN = [["all", "All", "#eef1f7"], ["anime", "Anime", "var(--anime)"], ["art", "Art", "var(--art)"], ["creative", "Creative", "var(--creative)"], ["standard", "Standard", "var(--standard)"]];
+const GCOL = { anime: "#ff8fc8", art: "#e8c27a", creative: "#5ee6ff", standard: "#9fb4ff" };
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let CAT = [], state = { g: "all", p: 1, q: "" };
+
+function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  state.g = GEN.some(g => g[0] === h.get("g")) ? h.get("g") : "all";
+  state.p = Math.max(1, parseInt(h.get("p"), 10) || 1);
+  state.q = h.get("q") || "";
+}
+function writeHash() {
+  const h = new URLSearchParams(); if (state.g !== "all") h.set("g", state.g); if (state.p > 1) h.set("p", state.p); if (state.q) h.set("q", state.q);
+  const s = h.toString(); history.replaceState(null, "", s ? "#" + s : location.pathname + location.search);
+}
+function filtered() {
+  const q = state.q.trim().toLowerCase();
+  return CAT.filter(x => (state.g === "all" || x.genre === state.g) && (!q || [x.name, x.pal, x.bg, x.counter, x.hist, x.mods, x.layout, x.type, x.decor, "#" + x.seed, String(x.seed)].join(" ").toLowerCase().includes(q)));
+}
+
+/* previews: only iframes on (or near) screen are loaded; off-screen ones are unloaded */
+const io = new IntersectionObserver(es => {
+  for (const e of es) {
+    const f = e.target;
+    if (e.isIntersecting) { if (!f.getAttribute("src") || f.getAttribute("src") === "about:blank") { f.classList.remove("on"); f.src = f.dataset.src } }
+    else if (f.getAttribute("src") && f.getAttribute("src") !== "about:blank") { f.src = "about:blank"; f.classList.remove("on") }
+  }
+}, { rootMargin: "120px 0px" });
+const scaleRO = new ResizeObserver(es => { for (const e of es) { const f = e.target.querySelector("iframe"); if (f) f.style.transform = `scale(${e.contentRect.width / 1300})` } });
+
+function render() {
+  const list = filtered(), pages = Math.max(1, Math.ceil(list.length / PER));
+  state.p = Math.min(state.p, pages); writeHash();
+  $("#tabs").innerHTML = GEN.map(([k, label, c]) => { const n = k === "all" ? CAT.length : CAT.filter(x => x.genre === k).length; return `<button class="tab" role="tab" aria-selected="${state.g === k}" data-g="${k}"><i style="background:${c}"></i>${label}<small>${n}</small></button>` }).join("");
+  $("#pg").value = state.p; $("#pages").textContent = pages;
+  $("#prev").disabled = state.p <= 1; $("#next").disabled = $("#next2").disabled = state.p >= pages;
+  const g = $("#grid");
+  g.querySelectorAll("iframe").forEach(f => { io.unobserve(f); f.src = "about:blank" });
+  g.querySelectorAll(".view").forEach(v => scaleRO.unobserve(v));
+  const items = list.slice((state.p - 1) * PER, state.p * PER);
+  if (!items.length) { g.innerHTML = `<div class="empty">No designs match that filter.</div>`; return }
+  g.innerHTML = items.map(x => {
+    const url = `remix.html?seed=${x.seed}`;
+    return `<article class="card"><div class="view" style="background:linear-gradient(135deg,${x.bgc},${x.acc})"><div class="ph" style="color:${x.dark ? "#ffffffaa" : "#000000aa"}">${esc(x.bg)} · ${esc(x.layout)}</div><iframe tabindex="-1" loading="lazy" data-src="${url}&preview=1" title="${esc(x.name)}"></iframe><a href="${url}" aria-label="Open ${esc(x.name)}"></a></div>
+      <div class="meta"><div class="row"><b title="${esc(x.name)}">${esc(x.name)}</b><a href="${url}">open ↗</a></div>
+      <div class="tags"><span class="chip" style="background:${GCOL[x.genre]}">${x.genre}</span>No. ${x.seed} · ${esc(x.pal)} · ${esc(x.bg)} · ${esc(x.counter)} · ${esc(x.hist)}</div></div></article>`;
+  }).join("");
+  g.querySelectorAll(".view").forEach(v => { scaleRO.observe(v); const f = v.querySelector("iframe"); f.addEventListener("load", () => { if (f.getAttribute("src") !== "about:blank") f.classList.add("on") }); io.observe(f) });
+}
+function setPage(p) { state.p = p; render(); scrollTo({ top: 0, behavior: "smooth" }) }
+
+$("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-g]"); if (!b) return; state.g = b.dataset.g; state.p = 1; render() });
+$("#prev").onclick = () => setPage(state.p - 1);
+$("#next").onclick = $("#next2").onclick = () => setPage(state.p + 1);
+$("#pg").onchange = e => setPage(Math.max(1, parseInt(e.target.value, 10) || 1));
+let qT; $("#q").addEventListener("input", e => { clearTimeout(qT); qT = setTimeout(() => { state.q = e.target.value; state.p = 1; render() }, 200) });
+$("#surprise").onclick = () => { const l = filtered(); const pool = l.length ? l : CAT; if (!pool.length) return; location.href = `remix.html?seed=${pool[Math.floor(Math.random() * pool.length)].seed}` };
+addEventListener("keydown", e => { if (e.target.tagName === "INPUT") return; if (e.key === "ArrowRight" && !$("#next").disabled) setPage(state.p + 1); if (e.key === "ArrowLeft" && !$("#prev").disabled) setPage(state.p - 1) });
+addEventListener("hashchange", () => { readHash(); $("#q").value = state.q; render() });
+
+addEventListener("message", e => {
+  const m = e.data; if (!m || !m.remixCatalog || CAT.length) return;
+  CAT = m.remixCatalog;
+  const fmt = n => n >= 1e9 ? (n / 1e9).toFixed(1) + " billion" : n.toLocaleString("en-GB");
+  $("#sub").innerHTML = `1,000 Token Burn dashboards, each generated from a seed by the <a href="remix.html">remix engine</a> — same live numbers, ${fmt(m.combos.total)} possible module combinations, ${m.distinct.toLocaleString("en-GB")} distinct ones here. Seeds 1–250 anime, 251–500 art, 501–750 creative, 751–1000 standard.`;
+  $("#cat").remove();
+  readHash(); $("#q").value = state.q; render();
+});
+</script>
+</body>
+</html>

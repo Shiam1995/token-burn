@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plasma Stellarator</title>
+<meta name="description" content="A five-period stellarator in a control room: helical plasma banded by model share, heated by today's burn, with every day logged as a shot.">
+<style>
+:root{
+  --bg:#02040a; --ink:#dfe9f7; --dim:#7489a6; --faint:#3a4a63; --line:rgba(120,170,230,.18);
+  --hud:#8ff3ff; --warn:#ffb84a; --hot:#ff7a3d; --panel:rgba(6,12,24,.62);
+  --mono:"DejaVu Sans Mono","Noto Sans Mono","Liberation Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:12px/1.4 var(--mono);overflow:hidden}
+body{background:radial-gradient(ellipse 70% 60% at 50% 46%,#0a1426 0%,#03060d 62%,#010205 100%)}
+#stage{position:fixed;inset:0}
+#stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#scan{position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
+#vign{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
+.panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px 14px;
+  backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.panel::before,.panel::after{content:"";position:absolute;width:9px;height:9px;border:1px solid var(--hud);opacity:.7}
+.panel::before{left:-1px;top:-1px;border-right:0;border-bottom:0}
+.panel::after{right:-1px;bottom:-1px;border-left:0;border-top:0}
+.lbl{color:var(--dim);font-size:10px;letter-spacing:.16em;text-transform:uppercase}
+.lbl b{color:var(--hud);font-weight:normal}
+#top{left:18px;top:16px;right:auto;min-width:470px}
+#brand{display:flex;justify-content:space-between;gap:14px;align-items:baseline}
+#brand .t{font-size:11px;letter-spacing:.3em;color:var(--hud)}
+#status{font-size:10px;letter-spacing:.14em;color:var(--warn)}
+#status i{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-right:6px;box-shadow:0 0 8px var(--warn);animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+#total{font-size:46px;line-height:1.05;margin:6px 0 2px;letter-spacing:.02em;font-variant-numeric:tabular-nums;
+  color:#fff;text-shadow:0 0 18px rgba(143,243,255,.55),0 0 2px #fff;white-space:nowrap}
+#total small{font-size:14px;color:var(--dim);letter-spacing:.1em;margin-left:8px;text-shadow:none}
+#sub{display:flex;gap:22px;margin-top:6px}
+#sub div>b{display:block;font-size:17px;font-weight:normal;color:#fff;font-variant-numeric:tabular-nums}
+#left{left:18px;top:200px;width:250px}
+.g{margin:0 0 11px}
+.g:last-child{margin:0}
+.gv{display:flex;justify-content:space-between;align-items:baseline}
+.gv b{font-size:16px;font-weight:normal;color:#fff;font-variant-numeric:tabular-nums}
+.gv em{font-style:normal;color:var(--faint);font-size:10px}
+.bar{height:4px;background:rgba(120,170,230,.12);margin-top:4px;position:relative;overflow:hidden}
+.bar span{position:absolute;left:0;top:0;bottom:0;background:var(--hud);box-shadow:0 0 8px var(--hud)}
+#split{display:flex;height:9px;margin:6px 0 4px;border:1px solid var(--line)}
+#split span{display:block;height:100%}
+#right{right:18px;top:16px;width:300px}
+#species{margin-top:8px}
+.sp{display:grid;grid-template-columns:12px 1fr auto;gap:8px;align-items:center;padding:3px 0;border-bottom:1px dashed rgba(120,170,230,.08)}
+.sp i{width:10px;height:10px;border-radius:50%}
+.sp .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp .n em{font-style:normal;color:var(--faint);font-size:10px;margin-left:6px}
+.sp .v{text-align:right;font-variant-numeric:tabular-nums;color:#fff}
+.sp .v em{display:block;font-style:normal;color:var(--dim);font-size:10px}
+#log{left:18px;right:18px;bottom:14px;height:146px;padding:10px 14px 8px}
+#logHead{display:flex;justify-content:space-between;gap:12px}
+#logCv{position:absolute;left:14px;right:14px;top:30px;bottom:8px;width:calc(100% - 28px);height:calc(100% - 38px)}
+#tip{position:fixed;pointer-events:none;background:rgba(4,10,20,.94);border:1px solid var(--hud);padding:6px 9px;font-size:11px;display:none;z-index:9;white-space:nowrap}
+#event{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);font-size:26px;letter-spacing:.4em;color:#fff;
+  text-shadow:0 0 24px var(--hot),0 0 4px #fff;opacity:0;pointer-events:none;white-space:nowrap;text-align:center}
+#event small{display:block;font-size:12px;letter-spacing:.3em;color:var(--warn);margin-top:6px}
+#demo{color:var(--warn)}
+@media (max-width:1000px){ #left{display:none} }
+@media (max-width:760px){
+  html,body{overflow:auto;height:auto}
+  #stage{position:relative;height:56vh;min-height:330px}
+  #top,#left,#right,#log{position:relative;left:auto;right:auto;top:auto;bottom:auto;width:auto;min-width:0;margin:10px 16px}
+  #sub{flex-wrap:wrap;gap:10px 22px}
+  #left{display:block}
+  #top{margin-top:-40px}
+  #total{font-size:31px}
+  #log{height:150px}
+  #event{font-size:16px;letter-spacing:.25em;top:40%}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cvBack"></canvas>
+  <canvas id="cvPlasma"></canvas>
+  <canvas id="cvFront"></canvas>
+  <div id="scan"></div><div id="vign"></div>
+  <div id="event"></div>
+</div>
+
+<div class="panel" id="top">
+  <div id="brand"><span class="t">TOKEN BURN · TB-5 STELLARATOR</span><span id="status"><i></i>PLASMA ON</span></div>
+  <div class="lbl" style="margin-top:8px">Integrated yield · tokens burned <span id="demo"></span></div>
+  <div id="total">0</div>
+  <div id="sub">
+    <div><span class="lbl">Today · shot <b id="shotNo">#0</b></span><b id="today">0</b></div>
+    <div><span class="lbl">7-day fluence</span><b id="week">0</b></div>
+    <div><span class="lbl">Core T<sub>e</sub></span><b id="te">0 keV</b></div>
+  </div>
+</div>
+
+<div class="panel" id="left">
+  <div class="g"><div class="lbl">Confinement τ<sub>E</sub> <em>· mean/day, 7d</em></div>
+    <div class="gv"><b id="tau">0</b><em>tok/day</em></div><div class="bar"><span id="tauBar"></span></div></div>
+  <div class="g"><div class="lbl">Peak shot <em style="font-style:normal;color:var(--faint)">· best day</em></div>
+    <div class="gv"><b id="peak">0</b><em id="peakD"></em></div><div class="bar"><span id="peakBar" style="background:var(--warn);box-shadow:0 0 8px var(--warn)"></span></div></div>
+  <div class="g"><div class="lbl">Diagnostics · measured / modelled</div>
+    <div id="split"></div>
+    <div class="gv"><span><span style="color:var(--hud)">■</span> Thomson <b id="meas" style="font-size:13px">0</b></span></div>
+    <div class="gv"><span><span style="color:var(--warn)">■</span> modelled <b id="est" style="font-size:13px">0</b></span></div></div>
+  <div class="g"><div class="lbl">Operating cost since 17 Nov</div>
+    <div class="gv"><b id="paid">0</b><em id="since"></em></div></div>
+  <div class="g"><div class="lbl">Field periods · coils</div>
+    <div class="gv"><b>5 · 40</b><em>ι ≈ 0.87</em></div></div>
+</div>
+
+<div class="panel" id="right">
+  <div class="lbl">Ion species · <b>models</b></div>
+  <div id="species"></div>
+  <div class="lbl" style="margin-top:8px;font-size:9px;color:var(--faint)">plasma bands: width ∝ share (small species widened)</div>
+</div>
+
+<div class="panel" id="log">
+  <div id="logHead"><span class="lbl">Shot log · <b id="nShots">0</b> shots since <span id="first"></span></span>
+    <span class="lbl" id="logNote">bar = day · hatched = estimated</span></div>
+  <canvas id="logCv"></canvas>
+</div>
+<div id="tip"></div>
+
+<script src="tb-data.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const cvB = $("cvBack"), cvP = $("cvPlasma"), cvF = $("cvFront");
+const cB = cvB.getContext("2d"), cP = cvP.getContext("2d"), cF = cvF.getContext("2d");
+let W = 0, H = 0, DPR = 1, S = 1, CX = 0, CY = 0, phone = false;
+
+// ---------- geometry: a 5-period stellarator ----------
+const N = 5, R0 = 1, DAX = 0.12, A = 0.31, B = 0.135, IOTA = 0.87;
+const tmp = [0, 0, 0];
+function surf(rho, th, ph, o) {
+  const al = N * ph / 2;
+  const rax = R0 + DAX * Math.cos(N * ph), zax = DAX * Math.sin(N * ph);
+  const ct = Math.cos(th), st = Math.sin(th);
+  const u = rho * A * (ct + 0.16 * Math.cos(2 * th) - 0.08);
+  const v = rho * B * st * (1 + 0.28 * ct);
+  const ca = Math.cos(al), sa = Math.sin(al);
+  const R = rax + u * ca - v * sa, Z = zax + u * sa + v * ca;
+  o[0] = R * Math.cos(ph); o[1] = R * Math.sin(ph); o[2] = Z;
+}
+// camera
+let yaw = 0.4, EL = 0.55, DIST = 6;
+let cy_ = Math.cos(yaw), sy_ = Math.sin(yaw);
+const ce = Math.cos(EL), se = Math.sin(EL);
+const pr = [0, 0, 0, 0]; // sx, sy, depth, f
+function proj(x, y, z) {
+  const x1 = x * cy_ - y * sy_, y1 = x * sy_ + y * cy_;
+  const up = y1 * se + z * ce;
+  const dep = DIST + y1 * ce - z * se;
+  const f = DIST / dep;
+  pr[0] = CX + x1 * f * S; pr[1] = CY - up * f * S; pr[2] = dep; pr[3] = f;
+}
+
+// ---------- data state ----------
+let D = null, shown = 0, target = 0, startT = 0, lastTotal = 0;
+let heat = 0.5, heatT = 0.5;          // plasma temperature (0..1), eased
+let bands = [];                        // [{start,end,color,rgb,name}]
+const hexRgb = h => { h = h.replace("#", ""); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; };
+
+// ---------- particles ----------
+let NP = 2600;
+let pRho, pTh, pPh, pSp, pM;
+function initParticles() {
+  NP = phone ? 1300 : 2600;
+  pRho = new Float32Array(NP); pTh = new Float32Array(NP); pPh = new Float32Array(NP); pSp = new Float32Array(NP); pM = new Uint8Array(NP);
+  for (let i = 0; i < NP; i++) {
+    pRho[i] = Math.pow(Math.random(), 0.6) * 0.98 + 0.02;
+    pTh[i] = Math.random() * Math.PI * 2;
+    pPh[i] = Math.random() * Math.PI * 2;
+    pSp[i] = 0.6 + Math.random() * 0.8;
+  }
+  assignModels();
+}
+function assignModels() {
+  if (!pM || !bands.length) return;
+  for (let i = 0; i < NP; i++) {
+    // field-line label: the poloidal angle at phi=0, so bands follow the twist
+    let t0 = ((pTh[i] - IOTA * pPh[i]) / (Math.PI * 2)) % 1; if (t0 < 0) t0 += 1;
+    let k = 0; while (k < bands.length - 1 && t0 > bands[k].end) k++;
+    pM[i] = k;
+  }
+}
+function buildBands(models) {
+  const top = models.slice(0, 10);
+  const vis = top.map(m => Math.max(0.035, Math.pow(m.share, 0.6)));
+  const sum = vis.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  bands = top.map((m, i) => { const s = acc; acc += vis[i] / sum; return { name: m.name, start: s, end: acc, color: m.color, rgb: hexRgb(m.color) }; });
+  bucketCols = null;
+}
+// colour buckets: model x radius(3) x depth(3)
+let bucketCols = null;
+function makeBucketCols() {
+  bucketCols = [];
+  const hot = heat;
+  for (const b of bands) {
+    for (let r = 0; r < 3; r++) for (let d = 0; d < 3; d++) {
+      const w = r === 0 ? 0.25 + 0.5 * hot : r === 1 ? 0.05 + 0.15 * hot : 0.0; // core whitens with temperature
+      const c = b.rgb.map(x => Math.round(x + (255 - x) * w));
+      const a = [0.95, 0.62, 0.34][d] * (0.55 + 0.45 * hot);
+      bucketCols.push(`rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`);
+    }
+  }
+}
+let buckets = [];
+
+// glow sprite
+const glow = document.createElement("canvas"); glow.width = glow.height = 64;
+(() => { const g = glow.getContext("2d"), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, "rgba(255,240,220,1)"); gr.addColorStop(0.25, "rgba(255,170,110,.55)"); gr.addColorStop(1, "rgba(255,90,40,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64); })();
+
+// ---------- coils ----------
+const NC = 40, CSEG = 44;
+const coilPts = [];
+for (let k = 0; k < NC; k++) {
+  const ph0 = (k + 0.5) / NC * Math.PI * 2, pts = [];
+  for (let j = 0; j <= CSEG; j++) {
+    const th = j / CSEG * Math.PI * 2;
+    const al = N * ph0 / 2;
+    const ph = ph0 + 0.03 * Math.sin(th - al) + 0.012 * Math.sin(2 * th + k); // non-planar modular coil wobble
+    surf(1.42 + 0.05 * Math.cos(2 * th), th, ph, tmp);
+    pts.push([tmp[0], tmp[1], tmp[2], th]);
+  }
+  coilPts.push(pts);
+}
+// axis samples for depth reference
+function axisDepthAt(ph) {
+  const rax = R0 + DAX * Math.cos(N * ph);
+  proj(rax * Math.cos(ph), rax * Math.sin(ph), DAX * Math.sin(N * ph));
+  return pr[2];
+}
+
+function drawCoils(t) {
+  cB.clearRect(0, 0, W, H); cF.clearRect(0, 0, W, H);
+  cB.lineCap = cF.lineCap = "round";
+  const lw = S * 0.019;
+  for (let k = 0; k < NC; k++) {
+    const pts = coilPts[k], ph0 = (k + 0.5) / NC * Math.PI * 2;
+    const ad = axisDepthAt(ph0);
+    for (let j = 0; j < CSEG; j++) {
+      const a = pts[j], b = pts[j + 1];
+      proj((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
+      const dep = pr[2], f = pr[3];
+      proj(a[0], a[1], a[2]); const x1 = pr[0], y1 = pr[1];
+      proj(b[0], b[1], b[2]); const x2 = pr[0], y2 = pr[1];
+      const front = dep < ad;
+      const ctx = front ? cF : cB;
+      // lit from above + plasma side
+      const lit = 0.5 + 0.5 * Math.sin(a[3]);
+      const fog = Math.max(0, Math.min(1, (DIST + 1.8 - dep) / 3.0));
+      const r = Math.round(60 + 150 * lit * fog), g = Math.round(42 + 95 * lit * fog), bl = Math.round(36 + 55 * lit * fog);
+      ctx.strokeStyle = `rgba(${r},${g},${bl},${front ? 0.86 : 0.95})`;
+      ctx.lineWidth = lw * f * (front ? 1 : 0.9);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
+  // plasma light reflected on front coils
+  cF.globalCompositeOperation = "source-atop";
+  const gr = cF.createRadialGradient(CX, CY, S * 0.2, CX, CY, S * 1.7);
+  const c = bands[0] ? bands[0].rgb : [255, 122, 61];
+  gr.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},${0.22 + 0.3 * heat})`); gr.addColorStop(1, "rgba(0,0,0,0)");
+  cF.fillStyle = gr; cF.fillRect(0, 0, W, H);
+  cF.globalCompositeOperation = "source-over";
+  // field lines (glowing, marching dashes)
+  cF.globalCompositeOperation = "lighter";
+  for (let L = 0; L < 3; L++) {
+    cF.beginPath();
+    const th0 = L * 2.1, rho = 1.08 + L * 0.08;
+    for (let s = 0; s <= 420; s++) {
+      const ph = s / 420 * Math.PI * 2 * 1.0;
+      surf(rho, th0 + IOTA * ph * 1.0 + ph * 0, ph, tmp);
+      proj(tmp[0], tmp[1], tmp[2]);
+      s ? cF.lineTo(pr[0], pr[1]) : cF.moveTo(pr[0], pr[1]);
+    }
+    cF.setLineDash([S * 0.05, S * 0.11]); cF.lineDashOffset = -t * S * 0.12 * (1 + heat);
+    cF.strokeStyle = `rgba(150,235,255,${0.16 + 0.18 * heat})`; cF.lineWidth = 1.4; cF.stroke();
+  }
+  cF.setLineDash([]);
+  cF.globalCompositeOperation = "source-over";
+}
+
+// ---------- plasma ----------
+function drawPlasma(dt, t) {
+  cP.globalCompositeOperation = "source-over";
+  cP.fillStyle = `rgba(2,4,10,${0.24 - 0.08 * heat})`;
+  cP.fillRect(0, 0, W, H);
+  cP.globalCompositeOperation = "lighter";
+  // core glow along the magnetic axis
+  const gs = S * (0.22 + 0.16 * heat);
+  cP.globalAlpha = 0.05 + 0.09 * heat;
+  for (let s = 0; s < 90; s++) {
+    const ph = s / 90 * Math.PI * 2;
+    const rax = R0 + DAX * Math.cos(N * ph);
+    proj(rax * Math.cos(ph), rax * Math.sin(ph), DAX * Math.sin(N * ph));
+    const z = gs * pr[3];
+    cP.drawImage(glow, pr[0] - z, pr[1] - z, 2 * z, 2 * z);
+  }
+  cP.globalAlpha = 1;
+  if (!bucketCols) makeBucketCols();
+  const nb = bands.length * 9;
+  if (buckets.length !== nb) { buckets = []; for (let i = 0; i < nb; i++) buckets.push([]); }
+  for (const b of buckets) b.length = 0;
+  const v = dt * (0.35 + 1.25 * heat);
+  const sz = Math.max(1.1, S * 0.0075);
+  for (let i = 0; i < NP; i++) {
+    pPh[i] += v * pSp[i] * 0.55;
+    pTh[i] += v * pSp[i] * 0.55 * IOTA;
+    if (pPh[i] > 6.2831853) pPh[i] -= 6.2831853;
+    // small turbulent wobble, stronger when hot
+    const rho = pRho[i] * (1 + 0.025 * heat * Math.sin(t * 3 + i));
+    surf(rho, pTh[i], pPh[i], tmp);
+    proj(tmp[0], tmp[1], tmp[2]);
+    const dz = pr[2] - DIST;
+    const di = dz < -0.45 ? 0 : dz < 0.45 ? 1 : 2;
+    const ri = pRho[i] < 0.35 ? 0 : pRho[i] < 0.7 ? 1 : 2;
+    const bi = pM[i] * 9 + ri * 3 + di;
+    const arr = buckets[bi]; if (arr) arr.push(pr[0], pr[1], pr[3]);
+  }
+  for (let bi = 0; bi < nb; bi++) {
+    const arr = buckets[bi]; if (!arr.length) continue;
+    cP.fillStyle = bucketCols[bi];
+    for (let j = 0; j < arr.length; j += 3) { const s = sz * arr[j + 2]; cP.fillRect(arr[j] - s / 2, arr[j + 1] - s / 2, s, s); }
+  }
+  // flash events
+  if (flash > 0.001) {
+    cP.globalAlpha = flash;
+    const z = S * 2.2;
+    cP.drawImage(glow, CX - z, CY - z * 0.7, 2 * z, 1.4 * z);
+    cP.globalAlpha = 1; flash *= Math.pow(0.15, dt);
+  }
+  cP.globalCompositeOperation = "source-over";
+}
+
+// ---------- HUD ----------
+let flash = 0;
+function event(title, sub) {
+  const e = $("event"); e.innerHTML = title + (sub ? `<small>${sub}</small>` : "");
+  e.animate([{ opacity: 0, letterSpacing: ".1em" }, { opacity: 1, offset: .15 }, { opacity: 1, offset: .7 }, { opacity: 0, letterSpacing: ".55em" }], { duration: 3800, easing: "ease-out" });
+  flash = 0.9;
+}
+const fmtDate = s => { const d = new Date(s + "T00:00"); return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
+const ION = ["H⁺", "D⁺", "T⁺", "He²⁺", "Li³⁺", "Be⁴⁺", "B⁵⁺", "C⁶⁺", "N⁷⁺", "O⁸⁺"];
+
+function setData(d) {
+  const first = !D;
+  D = d;
+  $("demo").textContent = d.demo ? "· DEMO DATA" : "";
+  if (first) { shown = Math.max(0, d.total - Math.max(d.today, d.total * 0.0015)); }
+  else if (d.total > target) { event("PELLET INJECTION", "+" + TB.full(d.total - target) + " tokens"); }
+  target = d.total;
+  heatT = Math.max(0.08, d.intensity);
+  buildBands(d.models);
+  assignModels();
+  $("shotNo").textContent = "#" + d.days.length;
+  $("today").textContent = TB.full(d.today);
+  $("week").textContent = TB.full(d.week);
+  $("te").textContent = (d.intensity * 24).toFixed(1) + " keV";
+  const tau = d.week / 7;
+  $("tau").textContent = TB.fmt(tau);
+  $("tauBar").style.width = Math.min(100, tau / d.maxDay * 100) + "%";
+  const pk = d.days.reduce((a, x) => x.tokens > a.tokens ? x : a, d.days[0] || { tokens: 0, d: d.todayISO });
+  $("peak").textContent = TB.fmt(pk.tokens); $("peakD").textContent = fmtDate(pk.d);
+  $("peakBar").style.width = "100%";
+  const tot = d.measured + d.estimated || 1;
+  $("split").innerHTML = `<span style="width:${d.measured / tot * 100}%;background:var(--hud);box-shadow:0 0 6px var(--hud)"></span><span style="width:${d.estimated / tot * 100}%;background:repeating-linear-gradient(45deg,var(--warn) 0 3px,#6b4a10 3px 6px)"></span>`;
+  $("meas").textContent = TB.fmt(d.measured) + " · " + (d.measured / tot * 100).toFixed(1) + "%";
+  $("est").textContent = TB.fmt(d.estimated) + " · " + (d.estimated / tot * 100).toFixed(1) + "%";
+  $("paid").textContent = d.cur + d.paid.toLocaleString("en-GB", { maximumFractionDigits: 0 });
+  $("since").textContent = TB.fmt(d.since) + " tok";
+  $("species").innerHTML = d.models.slice(0, 10).map((m, i) =>
+    `<div class="sp"><i style="background:${m.color};box-shadow:0 0 8px ${m.color}"></i><span class="n">${m.name}<em>${ION[i] || ""}</em></span><span class="v">${TB.fmt(m.tokens)}<em>${(m.share * 100).toFixed(m.share < 0.01 ? 2 : 1)}%</em></span></div>`).join("");
+  $("nShots").textContent = d.days.length; $("first").textContent = fmtDate(d.firstDay);
+  drawLog();
+}
+
+// shot log strip
+const logCv = $("logCv"), lc = logCv.getContext("2d");
+let logGeo = null;
+function drawLog(t = 0) {
+  if (!D) return;
+  const r = logCv.getBoundingClientRect(); const w = r.width, h = r.height;
+  if (!w) return;
+  if (logCv.width !== Math.round(w * DPR)) { logCv.width = Math.round(w * DPR); logCv.height = Math.round(h * DPR); }
+  lc.setTransform(DPR, 0, 0, DPR, 0, 0); lc.clearRect(0, 0, w, h);
+  const days = D.days, n = days.length; if (!n) return;
+  const gap = n > 80 ? 1 : 2, bw = Math.max(1, (w - 40) / n - gap), base = h - 14;
+  const sc = v => Math.sqrt(v / D.maxDay) * (base - 4);
+  // grid
+  lc.strokeStyle = "rgba(120,170,230,.10)"; lc.lineWidth = 1;
+  lc.fillStyle = "#3a4a63"; lc.font = "9px " + getComputedStyle(document.body).fontFamily;
+  for (const g of [0.1, 0.25, 0.5, 1]) { const y = base - Math.sqrt(g) * (base - 4); lc.beginPath(); lc.moveTo(0, y + .5); lc.lineTo(w - 40, y + .5); lc.stroke(); lc.fillText(TB.fmt(D.maxDay * g), w - 36, y + 3); }
+  const order = D.models.map(m => m.name);
+  logGeo = { x0: 0, bw, gap, n };
+  for (let i = 0; i < n; i++) {
+    const x = i * (bw + gap), day = days[i];
+    let y = base;
+    const totalH = sc(day.tokens), estFrac = day.est / (day.tokens || 1);
+    for (const name of order) {
+      const v = day.byModel[name]; if (!v) continue;
+      const hh = totalH * v / day.tokens;
+      lc.fillStyle = TB.color(name); lc.globalAlpha = 0.9;
+      lc.fillRect(x, y - hh, bw, hh); y -= hh;
+    }
+    lc.globalAlpha = 1;
+    if (estFrac > 0.01) { // hatch estimated share
+      const eh = totalH * estFrac;
+      lc.save(); lc.beginPath(); lc.rect(x, base - eh, bw, eh); lc.clip();
+      lc.strokeStyle = "rgba(0,0,0,.55)"; lc.lineWidth = 1.2;
+      for (let k = -bw; k < eh + bw; k += 4) { lc.beginPath(); lc.moveTo(x, base - k); lc.lineTo(x + bw, base - k - bw); lc.stroke(); }
+      lc.restore();
+    }
+  }
+  // latest shot marker (pulsing)
+  const xl = (n - 1) * (bw + gap) + bw / 2;
+  lc.strokeStyle = `rgba(143,243,255,${0.5 + 0.5 * Math.sin(t * 4)})`; lc.lineWidth = 1;
+  lc.beginPath(); lc.moveTo(xl, 0); lc.lineTo(xl, base); lc.stroke();
+  // dates
+  lc.fillStyle = "#5c6f8d";
+  lc.fillText(fmtDate(days[0].d), 0, h - 2);
+  const lt = "today", ltw = lc.measureText(lt).width; lc.fillText(lt, Math.min(w - 40 - ltw, xl - ltw / 2), h - 2);
+  if (n > 8) { const m = Math.floor(n / 2); lc.fillText(fmtDate(days[m].d), m * (bw + gap), h - 2); }
+}
+logCv.addEventListener("mousemove", e => {
+  if (!D || !logGeo) return;
+  const r = logCv.getBoundingClientRect(), i = Math.floor((e.clientX - r.left) / (logGeo.bw + logGeo.gap));
+  const day = D.days[i], tip = $("tip");
+  if (!day) { tip.style.display = "none"; return; }
+  const mods = Object.entries(day.byModel).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `<span style="color:${TB.color(k)}">■</span> ${k} ${TB.fmt(v)}`).join("<br>");
+  tip.innerHTML = `<b>Shot #${i + 1} · ${fmtDate(day.d)}</b><br>${TB.full(day.tokens)} tok${day.est ? " <span style='color:var(--warn)'>(" + TB.fmt(day.est) + " est.)</span>" : ""}<br>${mods}`;
+  tip.style.display = "block";
+  tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 12) + "px"; tip.style.top = (e.clientY - tip.offsetHeight - 10) + "px";
+});
+logCv.addEventListener("mouseleave", () => $("tip").style.display = "none");
+
+// ---------- layout ----------
+function resize() {
+  phone = innerWidth <= 760;
+  DPR = Math.min(1.5, devicePixelRatio || 1);
+  const st = $("stage").getBoundingClientRect();
+  W = st.width; H = st.height;
+  for (const c of [cvB, cvP, cvF]) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); c.getContext("2d").setTransform(DPR, 0, 0, DPR, 0, 0); }
+  if (phone) { S = Math.min(W * 0.27, H * 0.45); CX = W / 2; CY = H * 0.45; }
+  else {
+    const left = innerWidth > 1000 ? 280 : 20, right = 330;
+    const aw = W - left - right;
+    S = Math.min(aw * 0.31, (H - 200) * 0.56); S = Math.max(S, Math.min(W, H) * 0.24);
+    CX = left + aw / 2; CY = (H - 165) / 2 + 40;
+  }
+  const np = phone ? 1300 : 2600;
+  if (!pRho || pRho.length !== np) initParticles();
+  bucketCols = null; drawLog();
+}
+addEventListener("resize", resize);
+
+// ---------- main loop ----------
+let lastT = performance.now(), tt = 0, lastMilestone = -1;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (document.hidden) { lastT = now; return; }
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now; tt += dt;
+  yaw += dt * 0.045; cy_ = Math.cos(yaw); sy_ = Math.sin(yaw);
+  const nh = heat + (heatT - heat) * Math.min(1, dt * 1.5);
+  if (Math.abs(nh - heat) > 0.004) bucketCols = null;
+  heat = nh;
+  // counter
+  if (D) {
+    const prev = shown;
+    shown += (target - shown) * Math.min(1, dt * 1.6);
+    if (target - shown < 1) shown = target;
+    const mPrev = Math.floor(prev / 1e9), mNow = Math.floor(shown / 1e9);
+    if (lastMilestone >= 0 && mNow > mPrev) event("IGNITION", TB.full(mNow * 1e9) + " tokens");
+    lastMilestone = mNow;
+    $("total").innerHTML = TB.full(shown) + "<small>TOK</small>";
+  }
+  if (bands.length) { drawPlasma(dt, tt); drawCoils(tt); }
+  if ((tt * 10 | 0) % 2 === 0) drawLog(tt);
+}
+resize();
+TB.onData(setData);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

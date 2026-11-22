@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pointillist Park</title>
+<meta name="description" content="A Seurat-style pointillist lakeside park painted in thousands of settling dots: the counter is written in dots, every poplar on the far bank is a day, sails are models, and the dot colours mix in proportion to each model's share.">
+<style>
+:root{--wall:#2f3b37;--wall2:#24302c;--card:#f5efe0;--ink:#1e2540;--muted:#6b6a72;--gold:#b89a5a;--gold2:#7d6332}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:radial-gradient(ellipse at 45% 35%,#3c4a45 0%,var(--wall) 45%,var(--wall2) 100%);color:var(--ink);font-family:"DejaVu Serif","Nimbus Roman",Georgia,serif;overflow-x:hidden}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:26px;height:100vh;padding:24px 26px}
+.frame{position:relative;min-height:0;padding:16px;background:linear-gradient(135deg,#d9c38a,#8c6d34 30%,#e6d29a 52%,#7a5b28 75%,#c8ad6e);box-shadow:0 22px 50px rgba(0,0,0,.55),inset 0 0 0 2px rgba(0,0,0,.35)}
+.frame:before{content:"";position:absolute;inset:7px;border:2px solid rgba(60,40,10,.45);pointer-events:none}
+.canvasbox{position:relative;width:100%;height:100%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.5);background:#efe6d2;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid rgba(30,37,64,.35);padding:6px 9px;font-size:12px;line-height:1.4;white-space:nowrap;opacity:0;transition:opacity .15s;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.tip b{font-size:14px}
+.placard{align-self:center;background:var(--card);padding:20px 20px 16px;box-shadow:0 14px 30px rgba(0,0,0,.45),inset 0 0 0 1px rgba(0,0,0,.08);max-height:100%;overflow:auto}
+.placard .artist{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.placard h1{font-size:21px;font-style:italic;font-weight:400;margin:4px 0 2px;line-height:1.2}
+.placard .medium{font-size:12px;color:var(--muted);margin-bottom:12px}
+.total{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.cap{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:12px}
+.row2{display:flex;gap:16px}
+.row2>div{flex:1}
+.v{font-size:19px;font-weight:700}
+.split{display:flex;height:12px;margin:6px 0 4px;gap:3px}
+.split i{display:block;height:100%;background-image:radial-gradient(circle,currentColor 1.6px,transparent 2px);background-size:5px 5px}
+.splitl{display:flex;justify-content:space-between;font-size:12px}
+.splitl span{color:var(--muted)}
+ul{list-style:none;margin:6px 0 0;padding:0}
+li{display:grid;grid-template-columns:16px minmax(0,1fr) auto 42px;gap:7px;align-items:center;font-size:12.5px;padding:3px 0;border-bottom:1px dotted rgba(30,37,64,.2)}
+li .sw{width:13px;height:13px;border-radius:50%;background-image:radial-gradient(circle at 30% 30%,rgba(255,255,255,.6) 0 1.5px,transparent 2px),radial-gradient(circle at 70% 65%,rgba(0,0,0,.25) 0 1.5px,transparent 2px)}
+li .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+li .tk{font-weight:700;font-variant-numeric:tabular-nums}
+li .sh{text-align:right;color:var(--muted);font-size:11px}
+.key{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:10px}
+.key b{color:var(--ink);font-weight:600}
+.demo{color:#b0402a;font-size:11px;letter-spacing:.12em;margin-top:8px}
+@media (max-width:760px){
+  .wrap{display:block;height:auto;padding:14px 16px}
+  .frame{height:78vh;min-height:520px;padding:10px}
+  .frame:before{inset:4px}
+  .placard{margin-top:18px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="frame"><div class="canvasbox" id="box"><canvas id="c"></canvas><div class="tip" id="tip"></div></div></div>
+  <aside class="placard">
+    <div class="artist">Token Burn · after Seurat</div>
+    <h1>A Sunday Afternoon of Tokens</h1>
+    <div class="medium">Dots of model colour on canvas, <span id="span"></span></div>
+    <div class="cap" style="margin-top:4px">Total tokens burned</div>
+    <div class="total" id="total">—</div>
+    <div class="row2">
+      <div><div class="cap">Today</div><div class="v" id="today">—</div></div>
+      <div><div class="cap">This week</div><div class="v" id="week">—</div></div>
+    </div>
+    <div class="cap">Measured · estimated</div>
+    <div class="split"><i id="sm" style="color:#2b3a78"></i><i id="se" style="color:#c9822f"></i></div>
+    <div class="splitl"><div><b id="meas">—</b> <span>measured</span></div><div><b id="est">—</b> <span>estimated</span></div></div>
+    <div class="cap">The sails · models</div>
+    <ul id="models"></ul>
+    <div class="key"><b>Poplars</b> on the far bank are days, tallest = biggest day; green leaves were counted, <b>autumn</b> leaves were estimated. Each tree's dots mix that day's models. The <b>parasols</b> on the lawn are today's models, sized by their share of today. The <b>sun</b> and the lake's shimmer follow today's intensity.</div>
+    <div class="demo" id="demo"></div>
+  </aside>
+</div>
+<script src="tb-data.js"></script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const box = $("box"), cv = $("c"), ctx = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1, D = null, sig = "", built = false;
+let dots = null, N = 0, live = [], bake = null, baked = false, buildT = 0;
+let trees = [], boats = [], sparks = [], parasols = [];
+let slots = [], glyphs = {}, cFont = 0, cStep = 0, cX = 0, cY = 0, cBottom = 0, cStr = "";
+let shown = 0, tFrom = 0, tTo = 0, tStart = 0, lastMil = -1, hover = -1;
+
+/* ---------- colour + noise helpers ---------- */
+function rng(s){return function(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R0 = rng(3), NT = Array.from({length:4096},()=>R0());
+function vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+  const h=(a,b)=>NT[((a*73856093)^(b*19349663))&4095];
+  return (h(xi,yi)*(1-u)+h(xi+1,yi)*u)*(1-v)+(h(xi,yi+1)*(1-u)+h(xi+1,yi+1)*u)*v}
+const fbm=(x,y)=>vnoise(x,y)*.55+vnoise(x*2.1+5,y*2.1+3)*.3+vnoise(x*4.3+9,y*4.3+1)*.15;
+const hex = h => { h = h.replace("#",""); if (h.length===3) h = h.split("").map(c=>c+c).join(""); const n = parseInt(h,16); return [n>>16&255, n>>8&255, n&255]; };
+const mix = (a,b,t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+const css = c => `rgb(${c[0]|0},${c[1]|0},${c[2]|0})`;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtDate=s=>{const [y,m,d]=s.split("-");return +d+" "+MON[+m-1]+" "+y};
+
+/* ---------- layout constants (normalised) ---------- */
+const BANK = .52, LAKE_END = .74;
+const P = { // Seurat palette
+  skyTop:hex("#9fb6dd"), skyMid:hex("#cfd9e6"), skyLow:hex("#f2dcc0"), cloud:hex("#f7efe2"), sun:hex("#ffe6a0"),
+  farTree:hex("#6f8f8a"), farTree2:hex("#4f6f78"), bank:hex("#3f6b3a"), water:hex("#5f8fc4"), water2:hex("#9fc1df"), waterDark:hex("#3f5f9a"),
+  grassSun:hex("#a6b84a"), grassSun2:hex("#d4c45a"), grassShade:hex("#2f5a45"), shadeBlue:hex("#34507a"),
+  leaf:hex("#3f7a3a"), leaf2:hex("#7fa846"), autumn:hex("#c9822f"), autumn2:hex("#a5512a"), trunk:hex("#4a3a2c"),
+  orange:hex("#f0a050"), violet:hex("#7f6fb8"), ink:hex("#1e2a6e")
+};
+
+/* ---------- picking from models in proportion to share ---------- */
+let modelPick = () => null;
+function makePicker(list){ // list [{color, w}]
+  const tot = list.reduce((a,x)=>a+x.w,0) || 1; let acc = 0; const cum = list.map(x => (acc += x.w/tot, [acc, hex(x.color)]));
+  return r => { for (const [c,col] of cum) if (r <= c) return col; return cum.length ? cum[cum.length-1][1] : null; };
+}
+
+/* ---------- the scene: base colour at a point ---------- */
+function treeAt(x, y){
+  // returns {t, kind} for a day-poplar covering x,y (css px)
+  for (let k = 0; k < trees.length; k++){
+    const t = trees[k]; if (Math.abs(x - t.x) > t.rx + 2) continue;
+    const dy = (y - t.cy)/t.ry, dx = (x - t.x)/t.rx;
+    // poplar crown: pointed top, round bottom
+    const shape = dy < 0 ? dx*dx*(1 + (-dy)*.9) + dy*dy : dx*dx + dy*dy;
+    if (shape < 1) return {t, kind:"crown", dx, dy};
+    if (y > t.cy + t.ry*.7 && y < t.base && Math.abs(x - t.x) < Math.max(1.2, t.rx*.14)) return {t, kind:"trunk"};
+  }
+  return null;
+}
+function scene(x, y, r){
+  const u = x/W, v = y/H, I = D.intensity;
+  // painted border
+  const bw = Math.min(W,H)*.022 + 5;
+  if (x < bw || y < bw || x > W-bw || y > H-bw){
+    const pick = r(); return pick < .45 ? P.ink : pick < .7 ? P.orange : pick < .85 ? P.violet : mix(P.ink, P.waterDark, .5);
+  }
+  const bankY = BANK*H, lakeEnd = LAKE_END*H;
+  if (v < BANK){
+    const tr = treeAt(x, y);
+    if (tr){
+      if (tr.kind === "trunk") return mix(P.trunk, P.ink, r()*.4);
+      const day = tr.t, lit = clamp(.5 - tr.dx*.6 - tr.dy*.3, 0, 1);
+      const base = day.est ? mix(P.autumn2, P.autumn, lit) : mix(P.leaf, P.leaf2, lit);
+      const mc = day.pick(r());
+      return mc && r() < .5 ? mix(base, mc, .55) : base;
+    }
+    // far woods behind the poplars
+    const woodTop = (BANK - .055 - .035*fbm(u*6, 1)) * H;
+    if (y > woodTop) return mix(mix(P.farTree, P.skyMid, .35), P.farTree2, clamp((y-woodTop)/(bankY-woodTop),0,1)*.7 + r()*.2);
+    // sky: cool top, warm horizon, clouds, sun glow
+    let c = v < .25 ? mix(P.skyTop, P.skyMid, v/.25) : mix(P.skyMid, P.skyLow, (v-.25)/(BANK-.25));
+    const cl = fbm(u*3.2 + 7, v*7);
+    if (cl > .58) c = mix(c, P.cloud, clamp((cl-.58)*4, 0, .85));
+    const sx = .82*W, sy = .3*H, sd = Math.hypot(x - sx, y - sy)/(Math.min(W,H)*(.07 + .09*I));
+    if (sd < 3) c = mix(c, P.sun, clamp(1.1 - sd*.4, 0, 1));
+    return c;
+  }
+  if (y < bankY + H*.012) return mix(P.bank, P.grassShade, r()*.5);
+  if (v < LAKE_END){
+    // water with reflections of the poplars
+    const ry = bankY - (y - bankY)*1.15, tr = treeAt(x + Math.sin(y*.15)*2, ry);
+    let c = mix(P.water2, P.water, clamp((v - BANK)/(LAKE_END - BANK)*1.4, 0, 1));
+    if (tr && tr.kind === "crown") c = mix(c, tr.t.est ? P.autumn : P.leaf, .45);
+    else if (ry > (BANK - .055 - .035*fbm(u*6,1))*H) c = mix(c, P.farTree2, .35);
+    const glint = Math.abs(x - .82*W) < W*(.04 + .05*I) ? .45 : 0;
+    if (glint && r() < .5) c = mix(c, P.sun, glint);
+    return c;
+  }
+  // today's parasols: one per model used today, canopy size by its share of today
+  for (const p of parasols){
+    const dx = x - p.x, dy = y - p.y;
+    if (dy < 0 && dy > -p.r*.75 && (dx*dx)/(p.r*p.r) + (dy*dy)/(p.r*p.r*.55) < 1){
+      const lit = clamp(.55 - dx/p.r*.5, 0, 1); return mix(mix(p.col, [20,20,40], .35), mix(p.col, [255,250,235], .25), lit);
+    }
+    if (Math.abs(dx) < 3.2 && dy >= 0 && dy < p.r*1.05) return mix(P.trunk, P.ink, .3);
+    // shadow on the grass
+    const sx = dx + p.r*.3, sy = y - (p.y + p.r*1.05);
+    if ((sx*sx)/(p.r*p.r*.9) + (sy*sy)/(p.r*p.r*.05) < 1) return mix(P.grassShade, P.shadeBlue, r()*.5);
+  }
+  // near meadow with sunlight and tree shadows
+  const sh = fbm(u*2.6 + 2, v*9);
+  const g = (v - LAKE_END)/(1 - LAKE_END);
+  let c = sh > .64 ? mix(P.grassShade, P.shadeBlue, r()*.4) : mix(P.grassSun, P.grassSun2, clamp(.3 + g*.6 + (r()-.5)*.4, 0, 1));
+  if (r() < .035) c = r() < .5 ? hex("#e8e0f0") : hex("#e25c3c");
+  return c;
+}
+
+/* ---------- glyphs for the dotted counter ---------- */
+const CFONT = '"DejaVu Sans","Liberation Sans",sans-serif';
+function makeGlyphs(F, step){
+  glyphs = {};
+  const cw = Math.ceil(F*0.75), ch = Math.ceil(F*1.1), c = document.createElement("canvas"); c.width = cw; c.height = ch;
+  const g = c.getContext("2d", {willReadFrequently:true});
+  for (const chr of "0123456789,."){
+    g.clearRect(0,0,cw,ch); g.fillStyle = "#000"; g.font = `bold ${F}px ${CFONT}`; g.textBaseline = "alphabetic"; g.fillText(chr, 0, F*.92);
+    const data = g.getImageData(0,0,cw,ch).data, pts = [];
+    for (let y = step/2; y < ch; y += step) for (let x = step/2; x < cw; x += step){
+      const jx = x + ((y/step|0)%2 ? step*.5 : 0);
+      if (jx >= cw) continue;
+      if (data[((y|0)*cw + (jx|0))*4 + 3] > 120) pts.push([jx, y - F*.92]);
+    }
+    glyphs[chr] = {pts, w: g.measureText(chr).width};
+  }
+}
+function splitLines(str){
+  if (W >= 600) return [str];
+  const commas = [...str].map((c,i)=>c===","?i:-1).filter(i=>i>=0);
+  if (!commas.length) return [str];
+  let best = commas[0]; for (const c of commas) if (Math.abs(c - str.length/2) < Math.abs(best - str.length/2)) best = c;
+  return [str.slice(0, best+1), str.slice(best+1)];
+}
+function layoutCounter(str){
+  const lines = splitLines(str), g = ctx;
+  g.font = `bold 100px ${CFONT}`;
+  const wAt100 = Math.max(...lines.map(l => g.measureText(l).width));
+  const F = Math.min(H*(lines.length > 1 ? .1 : .16), (W < 600 ? W*.86 : W*.84)/wAt100*100, 150);
+  const step = Math.max(2.4, F/17);
+  if (Math.abs(F - cFont) > .5 || step !== cStep){ cFont = F; cStep = step; makeGlyphs(F, step); }
+  g.font = `bold ${F}px ${CFONT}`;
+  const old = slots; slots = []; let idx = 0;
+  cX = 1e9; cY = H*.05 + F*.88;
+  lines.forEach((l, li) => {
+    const tw = g.measureText(l).width; let x = W < 600 ? (W - tw)/2 : W*.07; cX = Math.min(cX, x);
+    const y = cY + li*F*1.02;
+    for (const ch of l){ const s = old[idx] || {dots: []}; s.x = x; s.y = y; s.chr = null; slots.push(s); x += glyphs[ch].w; idx++; }
+  });
+  cBottom = cY + (lines.length - 1)*F*1.02;
+  cStr = "";
+}
+function setCounter(str){
+  if (str.length !== cStr.length) layoutCounter(str);
+  const rr = Math.random, now = performance.now();
+  for (let i = 0; i < str.length; i++){
+    const s = slots[i], ch = str[i]; if (s.chr === ch) continue;
+    s.chr = ch; const pts = glyphs[ch].pts;
+    const need = Math.max(pts.length, 1);
+    while (s.dots.length < need){ s.dots.push({x: s.x + rr()*cFont*.6, y: s.y - rr()*cFont, fx:0, fy:0, tx: s.x, ty: s.y, t0: 0, c: counterColour(rr), r: cStep*(.58 + rr()*.16)}); }
+    if (s.dots.length > need*1.3) s.dots.length = need;
+    const order = pts.slice().sort(() => rr() - .5);
+    s.dots.forEach((d, k) => { const p = order[k % order.length] || [0,0];
+      const cur = dotPos(d, now); d.fx = cur[0]; d.fy = cur[1]; d.t0 = now + rr()*60;
+      d.tx = s.x + p[0] + (rr()-.5)*cStep*.2; d.ty = s.y + p[1] + (rr()-.5)*cStep*.2; });
+  }
+  cStr = str;
+}
+function dotPos(d, now){
+  if (!d.t0) return [d.x, d.y];
+  const k = ease((now - d.t0)/420); return [d.fx + (d.tx - d.fx)*k, d.fy + (d.ty - d.fy)*k];
+}
+let cPick = null;
+function counterColour(r){
+  const k = r();
+  if (k < .7) return css(mix(P.ink, hex("#2b3a9a"), r()*.8));
+  if (k < .86) return css(mix(P.violet, P.ink, .35 + r()*.4));
+  const mc = cPick ? cPick(r()) : null;
+  if (k < .96 && mc) return css(mix(mc, P.ink, .45));
+  return css(mix(P.orange, P.ink, .3));
+}
+
+/* ---------- build every dot ---------- */
+function build(){
+  const r = rng(42);
+  const mobile = W < 600;
+  // poplars: one per day along the far bank
+  const days = D.days, n = days.length, bankY = BANK*H, x0 = W*.05, x1 = W*.95, pitch = (x1 - x0)/Math.max(1, n);
+  trees = days.map((d, i) => {
+    const hn = Math.pow(d.tokens / D.maxDay, .7), hgt = H*(.035 + .22*hn), rx = Math.max(2.4, Math.min(pitch*.8, hgt*.26));
+    const list = Object.entries(d.byModel).map(([name, t]) => ({color: TB.color(name), w: t}));
+    return {i, d, x: x0 + (i + .5)*pitch, base: bankY + 2, top: bankY - hgt, cy: bankY - hgt*.55, ry: hgt*.45, rx, est: d.est > d.tokens*.5, pick: makePicker(list), hn};
+  });
+  // parasols from today's (or the latest day's) models
+  const lastDay = days[n-1] || {byModel:{}}, ent = Object.entries(lastDay.byModel).sort((a,b)=>b[1]-a[1]).slice(0, mobile ? 3 : 5), dsum = ent.reduce((a,e)=>a+e[1],0) || 1;
+  parasols = ent.map(([name, t], i) => ({name, t, col: hex(TB.color(name)), r: Math.min(W*.11, H*.045 + H*.06*Math.sqrt(t/dsum)), x: W*(.16 + (i + .5)/ent.length*.68) + (i%2 ? W*.03 : -W*.02), y: H*(LAKE_END + .1 + (i%2)*.1)}));
+  // sailboats: one per model
+  boats = D.models.map((m, i) => ({m, col: hex(m.color), s: (mobile? 9 : 13) + Math.pow(m.share, .3)*(mobile? 22 : 36), lane: i % 3, phase: r(), speed: .006 + r()*.01}));
+  modelPick = makePicker(D.models.map(m => ({color: m.color, w: m.tokens})));
+  cPick = modelPick;
+  slots = []; cStr = ""; layoutCounter(TB.full(shown));
+  // dots on a jittered grid
+  const area = W*H, cap = mobile ? 9000 : 17000, sp = Math.max(mobile? 4.2 : 5, Math.sqrt(area/(cap*.86)));
+  const arr = [];
+  const rowH = sp*.86;
+  for (let y = sp*.3, row = 0; y < H; y += rowH, row++){
+    for (let x = (row%2 ? sp*.5 : 0); x < W; x += sp){
+      const px = x + (r()-.5)*sp*.7, py = y + (r()-.5)*sp*.6;
+      let c = scene(px, py, r);
+      // pointillist vibration: jitter, then flecks of model colour in proportion to share
+      const k = r(), sky = py < BANK*H*.62;
+      if (sky && py < cBottom + cFont*.5 && px > cX - 30) c = mix(c, [246,240,226], .45);
+      if (k < (sky ? .13 : .3)){ const mc = modelPick(r()); if (mc) c = mix(c, mc, .38 + r()*.2); }
+      else if (k < .4) c = mix(c, [255,250,235], .25);
+      else if (k < .48) c = mix(c, P.violet, .25);
+      c = [c[0] + (r()-.5)*24, c[1] + (r()-.5)*24, c[2] + (r()-.5)*24];
+      const inLake = py > BANK*H + H*.012 && py < LAKE_END*H && px > 20 && px < W-20;
+      const a = r()*Math.PI*2, far = 60 + r()*260;
+      arr.push({tx: px, ty: py, sx: px + Math.cos(a)*far, sy: py + Math.sin(a)*far, c: css(c), r: sp*(.48 + r()*.2), delay: (py/H)*1.6 + r()*1.8, live: inLake, ph: r()*6.28});
+    }
+  }
+  dots = arr; N = arr.length; live = arr.filter(d => d.live);
+  baked = false; buildT = performance.now();
+  bake = document.createElement("canvas"); bake.width = W*DPR; bake.height = H*DPR;
+  setCounter(TB.full(shown));
+  built = true;
+}
+function doBake(){
+  const g = bake.getContext("2d"); g.setTransform(DPR,0,0,DPR,0,0);
+  g.fillStyle = "#efe6d2"; g.fillRect(0,0,W,H);
+  for (const d of dots){ if (d.live) continue; g.fillStyle = d.c; g.beginPath(); g.arc(d.tx, d.ty, d.r, 0, 6.2832); g.fill(); }
+  baked = true;
+}
+
+/* ---------- frame ---------- */
+let last = performance.now(), raf = 0, T = 0;
+const ease = t => t < 0 ? 0 : t > 1 ? 1 : 1 - Math.pow(1 - t, 3);
+function frame(){
+  const now = performance.now();
+  const dt = Math.min(.05, (now - last)/1000); last = now; T += dt;
+  raf = requestAnimationFrame(frame);
+  if (!built) return;
+  const c = ctx; c.setTransform(DPR,0,0,DPR,0,0);
+  const el = (now - buildT)/1000, I = D.intensity;
+  // counter value
+  const k = clamp((now - tStart)/3200, 0, 1); shown = tFrom + (tTo - tFrom)*ease(k);
+  const str = TB.full(shown); if (str !== cStr) setCounter(str);
+  $("total").textContent = TB.full(shown);
+  const mil = Math.floor(shown/1e8); if (lastMil >= 0 && mil > lastMil) burst(); lastMil = mil;
+  // canvas
+  if (!baked){
+    c.fillStyle = "#efe6d2"; c.fillRect(0,0,W,H);
+    let done = true;
+    for (const d of dots){
+      const p = ease((el - d.delay)/2.2); if (p < 1) done = false; if (p <= 0) continue;
+      c.globalAlpha = Math.min(1, p*1.6); c.fillStyle = d.c;
+      c.beginPath(); c.arc(d.sx + (d.tx - d.sx)*p, d.sy + (d.ty - d.sy)*p, d.r*(.4 + .6*p), 0, 6.2832); c.fill();
+    }
+    c.globalAlpha = 1;
+    if (done) doBake();
+  } else {
+    c.drawImage(bake, 0, 0, W, H);
+    // the lake shimmers: amplitude and speed follow today's intensity
+    const amp = .6 + 2.2*I, spd = .8 + 2.5*I;
+    for (const d of live){
+      c.fillStyle = d.c; c.beginPath(); c.arc(d.tx + Math.sin(T*spd + d.ty*.25 + d.ph*.3)*amp, d.ty, d.r, 0, 6.2832); c.fill();
+    }
+  }
+  drawBoats(c, el);
+  drawCounter(c, dt, el);
+  drawSparks(c, dt);
+  if (hover >= 0){ const t = trees[hover]; c.strokeStyle = "rgba(255,250,235,.9)"; c.lineWidth = 1.5; c.setLineDash([2,3]);
+    c.beginPath(); c.ellipse(t.x, t.cy, t.rx + 4, t.ry + 5, 0, 0, 6.2832); c.stroke(); c.setLineDash([]); }
+}
+function drawBoats(c, el){
+  const lakeTop = BANK*H + H*.03, lakeH = (LAKE_END - BANK)*H - H*.05, fade = clamp((el - 2.5)/1.5, 0, 1);
+  if (!fade) return;
+  c.globalAlpha = fade;
+  for (const b of boats){
+    const xspan = W*.86, x = W*.07 + ((b.phase + T*b.speed*(.5 + D.intensity)) % 1)*xspan;
+    const y = lakeTop + lakeH*(.3 + b.lane*.33) + Math.sin(T*1.2 + b.phase*9)*1.2, s = b.s, ds = Math.max(2.2, s*.11);
+    // sail of dots in the model colour, hull in dark ink, reflection below
+    const rr = rng((b.phase*1e6)|0);
+    for (let yy = 0; yy < s; yy += ds*1.5) for (let xx = 0; xx <= (yy/s)*s*.62; xx += ds*1.5){
+      const col = rr() < .8 ? b.col : mix(b.col, [255,255,255], .4);
+      c.fillStyle = css(col); c.beginPath(); c.arc(x + xx, y - s + yy + 2, ds*.75, 0, 6.2832); c.fill();
+      if (yy > s*.3){ c.globalAlpha = fade*.35; c.beginPath(); c.arc(x + xx + Math.sin(T*2 + yy)*1.2, y + (s - yy) + 6, ds*.7, 0, 6.2832); c.fill(); c.globalAlpha = fade; }
+    }
+    c.fillStyle = "rgb(40,36,60)";
+    for (let xx = -s*.3; xx < s*.85; xx += ds*1.3){ c.beginPath(); c.arc(x + xx, y + 3 + Math.abs(xx - s*.27)*.06, ds*.8, 0, 6.2832); c.fill(); }
+    c.fillStyle = "rgb(50,40,40)"; c.fillRect(x - .6, y - s, 1.4, s + 2);
+    if (W >= 600 || b.m.share > .03){
+      c.font = `${W < 600 ? 10 : 11}px "DejaVu Serif",serif`; c.textAlign = "center"; c.lineWidth = 3; c.strokeStyle = "rgba(30,37,64,.75)";
+      c.strokeText(b.m.name, x + s*.25, y + 18); c.fillStyle = "rgba(255,250,235,.95)"; c.fillText(b.m.name, x + s*.25, y + 18);
+    }
+  }
+  c.globalAlpha = 1;
+}
+function drawCounter(c, dt, el){
+  const appear = clamp((el - 1)/2, 0, 1); if (!appear) return;
+  const now = performance.now();
+  c.globalAlpha = appear;
+  for (const s of slots) for (const d of s.dots){
+    const p = dotPos(d, now); d.x = p[0]; d.y = p[1];
+    c.fillStyle = d.c; c.beginPath(); c.arc(d.x, d.y, d.r, 0, 6.2832); c.fill();
+  }
+  c.font = `${W < 600 ? 11 : 13}px "DejaVu Serif",serif`; c.textAlign = W < 600 ? "center" : "left";
+  const txt = `tokens burned since ${fmtDate(D.firstDay)} · today ${TB.fmt(D.today)}`, tx = W < 600 ? W/2 : cX + 2, ty = cBottom + cFont*.36;
+  c.lineWidth = 3; c.strokeStyle = "rgba(245,238,222,.85)"; c.strokeText(txt, tx, ty);
+  c.fillStyle = "rgba(30,42,110,.95)"; c.fillText(txt, tx, ty);
+  c.globalAlpha = 1;
+}
+function burst(){
+  for (let i = 0; i < 140 && sparks.length < 400; i++){
+    const a = Math.random()*6.28, v = 40 + Math.random()*160, mc = modelPick(Math.random()) || P.orange;
+    sparks.push({x: cX + Math.random()*cFont*6, y: cY - cFont*.4, vx: Math.cos(a)*v, vy: Math.sin(a)*v - 40, life: 1, c: css(mc), r: 1.5 + Math.random()*2.5});
+  }
+}
+function drawSparks(c, dt){
+  // also a gentle sparkle on the sun's glint, more on busy days
+  if (Math.random() < D.intensity*.6 && sparks.length < 400) sparks.push({x: .82*W + (Math.random()-.5)*W*.08, y: BANK*H + Math.random()*(LAKE_END-BANK)*H*.6, vx: 0, vy: -4, life: .6, c: "rgb(255,246,210)", r: 1.6});
+  for (let i = sparks.length - 1; i >= 0; i--){ const s = sparks[i]; s.life -= dt*.6; if (s.life <= 0){ sparks.splice(i,1); continue }
+    s.x += s.vx*dt; s.y += s.vy*dt; s.vy += 60*dt*(s.vx ? 1 : 0);
+    c.globalAlpha = Math.min(1, s.life*1.5); c.fillStyle = s.c; c.beginPath(); c.arc(s.x, s.y, s.r, 0, 6.2832); c.fill(); }
+  c.globalAlpha = 1;
+}
+
+/* ---------- size, hover, visibility ---------- */
+function resize(){
+  const r = box.getBoundingClientRect(); W = Math.max(200, r.width|0); H = Math.max(200, r.height|0);
+  DPR = Math.min(window.devicePixelRatio||1, 2); cv.width = W*DPR; cv.height = H*DPR;
+  cFont = 0; if (D) build();
+}
+box.addEventListener("pointermove", e => {
+  const r = box.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, tip = $("tip");
+  let best = -1, bd = 1e9;
+  if (my > BANK*H - H*.3 && my < BANK*H + 12) for (const t of trees){ const d = Math.abs(t.x - mx); if (d < bd){ bd = d; best = t.i } }
+  if (best >= 0 && bd < Math.max(8, trees[best].rx + 3)){
+    hover = best; const x = trees[best].d;
+    tip.innerHTML = `<b>${TB.fmt(x.tokens)}</b> · ${fmtDate(x.d)}<br>${TB.full(x.tokens)} tokens${x.est ? `<br><span style="color:#a5512a">${TB.fmt(x.est)} estimated</span>` : ""}<br><span style="color:#6b6a72">${Object.entries(x.byModel).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>k+" "+TB.fmt(v)).join(" · ")}</span>`;
+    tip.style.opacity = 1; tip.style.left = clamp(mx + 12, 4, W - 220) + "px"; tip.style.top = clamp(my - 80, 4, H - 90) + "px";
+  } else { hover = -1; tip.style.opacity = 0; }
+});
+box.addEventListener("pointerleave", () => { hover = -1; $("tip").style.opacity = 0; });
+window.addEventListener("resize", () => { clearTimeout(window._rs); window._rs = setTimeout(resize, 150); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) cancelAnimationFrame(raf); else { last = performance.now(); raf = requestAnimationFrame(frame); } });
+
+/* ---------- data ---------- */
+TB.onData(d => {
+  const first = !D; D = d;
+  tFrom = first ? d.total*.99 : shown; tTo = d.total; tStart = performance.now(); if (first) shown = tFrom;
+  $("span").textContent = `${fmtDate(d.firstDay)} – ${fmtDate(d.todayISO)}`;
+  $("today").textContent = TB.fmt(d.today); $("week").textContent = TB.fmt(d.week);
+  const mt = (d.measured + d.estimated) || 1;
+  $("sm").style.flex = d.measured/mt; $("se").style.flex = d.estimated/mt;
+  $("meas").textContent = TB.fmt(d.measured); $("est").textContent = TB.fmt(d.estimated);
+  $("models").innerHTML = d.models.map(m => `<li><span class="sw" style="background-color:${m.color}"></span><span class="nm">${m.name}</span><span class="tk">${TB.fmt(m.tokens)}</span><span class="sh">${m.share >= .001 ? (m.share*100).toFixed(1) : "<0.1"}%</span></li>`).join("");
+  $("demo").textContent = d.demo ? "SAMPLE DATA · server not reachable" : "";
+  const s = d.days.map(x => x.d + ":" + x.tokens).join("|") + d.models.map(m => m.name).join();
+  if (s !== sig){ sig = s; if (W) build(); }
+});
+resize();
+raf = requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

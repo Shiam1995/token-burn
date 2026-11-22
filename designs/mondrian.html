@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>De Stijl Ledger</title>
+<meta name="description" content="A De Stijl homage to Mondrian: every red, blue and yellow rectangle is a model's share of the tokens, a strip of cells is the day history, and the grid quietly re-composes itself as the data changes.">
+<style>
+:root{--ink:#121212;--paper:#f3efe4;--red:#d42a1e;--blue:#1c3d97;--yellow:#f4c814;--grey:#c8c4b9;--white:#f3efe4}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ink)}
+body{color:var(--ink);font-family:"Futura","Century Gothic","Avenir Next","Helvetica Neue","Liberation Sans",Helvetica,Arial,sans-serif;overflow-x:hidden}
+#art{position:relative;margin:0 auto;background:var(--ink);overflow:hidden}
+.r{position:absolute;overflow:hidden;background:var(--paper);
+  transition:background-color 1.2s}
+.k{font-weight:800;text-transform:uppercase;letter-spacing:.14em;font-size:11px;opacity:.85}
+.big{font-weight:900;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tot{position:absolute;left:18px;right:14px;bottom:16px}
+.tot .k{margin-bottom:8px}
+.title{position:absolute;left:18px;top:16px;font-weight:900;letter-spacing:.32em;font-size:13px}
+.title b{display:inline-block;width:12px;height:12px;background:var(--red);margin-right:9px;vertical-align:-1px}
+.cell{position:absolute;inset:0;padding:12px 14px;display:flex;flex-direction:column;justify-content:flex-end}
+.cell .v{font-weight:900;font-variant-numeric:tabular-nums;line-height:1.05;white-space:nowrap}
+.cell .s{font-weight:700;font-size:11px;letter-spacing:.06em;opacity:.8;margin-top:3px;white-space:nowrap}
+.onink{color:var(--paper)}
+.ledger{position:absolute;inset:0;padding:14px 16px 10px;display:flex;flex-direction:column}
+.ledger .row{display:flex;align-items:center;gap:9px;font-weight:700;white-space:nowrap;border-top:2px solid var(--ink);flex:0 0 auto}
+.ledger .row{border-top:2px solid var(--ink)}
+.sw{width:14px;height:14px;flex:0 0 14px;border:2px solid var(--ink)}
+.ledger .nm{flex:1;overflow:hidden;text-overflow:ellipsis}
+.ledger .am{font-variant-numeric:tabular-nums}
+.ledger .pc{width:44px;text-align:right;opacity:.65;font-variant-numeric:tabular-nums}
+.strip{position:absolute;inset:0;background:var(--ink)}
+.strip>div{position:absolute}
+.slab{background:var(--paper);color:var(--ink);padding:12px 12px;display:flex;flex-direction:column;justify-content:space-between}
+.slab .v{font-weight:900;font-size:22px;line-height:1}
+#boogie{position:absolute;inset:0;pointer-events:none;transition:opacity .5s}
+.demo{position:fixed;right:10px;bottom:10px;background:var(--yellow);color:var(--ink);font:800 11px/1 sans-serif;letter-spacing:.1em;padding:6px 8px;border:3px solid var(--ink);display:none;z-index:5}
+</style>
+</head>
+<body>
+<div id="art"><canvas id="boogie"></canvas></div>
+<div class="demo" id="demo">SAMPLE DATA</div>
+<script src="tb-data.js"></script>
+<script>
+(function(){
+const art=document.getElementById('art'), cv=document.getElementById('boogie'), cx=cv.getContext('2d');
+const PAL={red:'#d42a1e',blue:'#1c3d97',yellow:'#f4c814',ink:'#121212',grey:'#c8c4b9',white:'#f3efe4'};
+const ORDER=['red','blue','yellow','ink','grey','white'];
+let composeId=0,D=null, disp=0, target=0, seed=0b1011, W=0, H=0, L=10, nodes={}, segs=[], squares=[], lastMove=0, lastBillion=null;
+const fullN=n=>TB.full(n);
+
+function palFor(i){return ORDER[i%ORDER.length]}
+function textOn(c){return (c==='red'||c==='blue'||c==='ink')?'#f3efe4':'#121212'}
+
+// --- binary partition (treemap in Mondrian dress) ---
+function part(items,r,depth,out){
+  if(!items.length)return;
+  if(items.length===1){out.push({it:items[0],r});return}
+  const sum=items.reduce((a,b)=>a+b.v,0);let acc=0,k=1,best=1e18;
+  for(let i=1;i<items.length;i++){acc+=items[i-1].v;const dd=Math.abs(sum/2-acc);if(dd<best){best=dd;k=i}}
+  const A=items.slice(0,k),B=items.slice(k),ra=A.reduce((a,b)=>a+b.v,0)/sum;
+  let horiz=r.w>=r.h; const asp=r.w/r.h;
+  if(((seed>>depth)&1)&&asp>.55&&asp<1.8)horiz=!horiz;
+  const swap=(seed>>(depth+4))&1;
+  let r1,r2;
+  if(horiz){const w1=r.w*(swap?1-ra:ra);r1={x:r.x,y:r.y,w:w1,h:r.h};r2={x:r.x+w1,y:r.y,w:r.w-w1,h:r.h}}
+  else{const h1=r.h*(swap?1-ra:ra);r1={x:r.x,y:r.y,w:r.w,h:h1};r2={x:r.x,y:r.y+h1,w:r.w,h:r.h-h1}}
+  if(swap){part(A,r2,depth+1,out);part(B,r1,depth+1,out)}else{part(A,r1,depth+1,out);part(B,r2,depth+1,out)}
+}
+const vs=(r,f)=>[{x:r.x,y:r.y,w:r.w,h:r.h*f},{x:r.x,y:r.y+r.h*f,w:r.w,h:r.h*(1-f)}];
+const hs=(r,f)=>[{x:r.x,y:r.y,w:r.w*f,h:r.h},{x:r.x+r.w*f,y:r.y,w:r.w*(1-f),h:r.h}];
+
+function compose(){
+  if(!D)return;
+  const vw=document.documentElement.clientWidth, vh=window.innerHeight;
+  if(!vw){setTimeout(compose,100);return}
+  const narrow=vw<720; L=narrow?7:10;
+  W=vw;
+  const nm=D.models.length;
+  let rects={}, A;
+  if(!narrow){
+    H=Math.max(620,vh); A={x:L/2,y:L/2,w:W-L,h:H-L};
+    const lf=Math.min(.42,Math.max(.33,470/W));
+    const [Lc,R]=seed&2?hs(A,lf):hs(A,lf);
+    let [t,rest]=vs(Lc,.30); rects.total=t;
+    let [tw,rest2]=vs(rest,.2/.7); const [ty,wk]=hs(tw,.56); rects.today=ty; rects.week=wk;
+    let [ms,ld]=vs(rest2,.14/.5);
+    const mf=Math.min(.82,Math.max(.18,D.measured/Math.max(1,D.measured+D.estimated)));
+    const [m1,m2]=hs(ms,mf); rects.meas=m1; rects.est=m2; rects.ledger=ld;
+    const [tm,st]=vs(R,.73); rects.tree=tm; rects.strip=st;
+  }else{
+    const hs_=[200,108,84,430,46+nm*30,190], tot=hs_.reduce((a,b)=>a+b,0);
+    H=tot+L; A={x:L/2,y:L/2,w:W-L,h:tot};
+    let y=A.y;const row=h=>{const r={x:A.x,y,w:A.w,h};y+=h;return r};
+    rects.total=row(hs_[0]); const tw=row(hs_[1]); [rects.today,rects.week]=hs(tw,.55);
+    const ms=row(hs_[2]); const mf=Math.min(.78,Math.max(.22,D.measured/Math.max(1,D.measured+D.estimated)));
+    [rects.meas,rects.est]=hs(ms,mf);
+    rects.tree=row(hs_[3]); rects.ledger=row(hs_[4]); rects.strip=row(hs_[5]);
+  }
+  art.style.width=W+'px'; art.style.height=H+'px';
+  // treemap
+  const items=D.models.map((m,i)=>({v:Math.max(m.tokens,1),m,i}));
+  const tiles=[]; part(items,rects.tree,0,tiles);
+  const want={};
+  const put=(id,r,bg,html,cls)=>{want[id]=1;let n=nodes[id];
+    if(!n){n=document.createElement('div');n.className='r';art.insertBefore(n,cv);nodes[id]=n;
+      n._cur={x:r.x+r.w/2,y:r.y+r.h/2,w:0,h:0}}
+    tween(n,{x:r.x+L/2,y:r.y+L/2,w:Math.max(0,r.w-L),h:Math.max(0,r.h-L)});
+    n.style.backgroundColor=PAL[bg]; n.style.color=textOn(bg);
+    if(html!==undefined&&n._h!==html){n.innerHTML=html;n._h=html}
+    return n};
+  // total block
+  const tr=rects.total, digits=fullN(D.total).length;
+  const fs=Math.min(tr.h*.36,(tr.w-L-34)/(digits*.6));
+  put('total',tr,'white',`<div class="title"><b></b>TOKEN BURN</div><div class="tot"><div class="k">tokens burned since ${D.firstDay}</div><div class="big" id="cnt" style="font-size:${fs.toFixed(1)}px">${fullN(disp)}</div></div>`);
+  const sf=narrow?26:Math.min(40,rects.today.h*.38);
+  put('today',rects.today,'yellow',`<div class="cell"><div class="k">today</div><div class="v" style="font-size:${sf}px">${TB.fmt(D.today)}</div><div class="s">${fullN(D.today)}</div></div>`);
+  put('week',rects.week,'white',`<div class="cell"><div class="k">7 days</div><div class="v" style="font-size:${sf*.7}px">${TB.fmt(D.week)}</div><div class="s">${(D.week/7>0?TB.fmt(D.week/7):'0')}/day</div></div>`);
+  const ms2=narrow?18:Math.min(24,rects.meas.h*.3);
+  put('meas',rects.meas,'white',`<div class="cell"><div class="k">measured</div><div class="v" style="font-size:${ms2}px">${TB.fmt(D.measured)}</div><div class="s">${(100*D.measured/Math.max(1,D.total)).toFixed(1)}% from logs</div></div>`);
+  put('est',rects.est,'grey',`<div class="cell"><div class="k">estimated</div><div class="v" style="font-size:${ms2}px">${TB.fmt(D.estimated)}</div><div class="s">${(100*D.estimated/Math.max(1,D.total)).toFixed(1)}%</div></div>`);
+  // ledger
+  const lh=rects.ledger.h-L, two=(lh-40)/Math.max(1,nm)<17&&rects.ledger.w>300, per=two?Math.ceil(nm/2):nm,
+    rowH=Math.max(15,Math.min(30,(lh-40)/Math.max(1,per))), lfs=Math.max(10,Math.min(14,rowH*.55));
+  let lg=`<div class="ledger"><div class="k" style="margin-bottom:8px">models · share of all tokens</div><div style="display:grid;grid-template-columns:${two?'1fr 1fr':'1fr'};grid-auto-flow:column;grid-template-rows:repeat(${per},auto);column-gap:14px">`;
+  D.models.forEach((m,i)=>{lg+=`<div class="row" style="height:${rowH}px;font-size:${lfs}px"><span class="sw" style="background:${PAL[palFor(i)]}"></span><span class="nm">${m.name}</span><span class="am">${TB.fmt(m.tokens)}</span><span class="pc">${m.share<.001?'&lt;0.1':(m.share*100).toFixed(1)}%</span></div>`});
+  put('ledger',rects.ledger,'white',lg+'</div></div>');
+  // tiles
+  tiles.forEach(t=>{const m=t.it.m,c=palFor(t.it.i),w=t.r.w-L,h=t.r.h-L;
+    let html='';
+    const f=Math.max(11,Math.min(34,Math.sqrt(w*h)/9,(h-30)/2.1));
+    if(w>70&&h>=60){
+      html=`<div class="cell"><div class="k" style="font-size:${Math.max(10,f*.42)}px">${m.name}</div><div class="v" style="font-size:${f}px">${TB.fmt(m.tokens)}</div>${h>f*1.6+60?`<div class="s">${(m.share*100).toFixed(1)}%</div>`:''}</div>`}
+    else if(h>=22&&w>(m.name.length+TB.fmt(m.tokens).length+3)*Math.min(12,h*.45)*.78+20){html=`<div class="cell" style="padding:0 10px;justify-content:center"><div class="s" style="opacity:1;margin:0;font-size:${Math.min(12,h*.45)}px">${m.name.toUpperCase()} · ${TB.fmt(m.tokens)}</div></div>`}
+    put('m:'+m.name,t.r,c,html)});
+  // strip
+  const sr=rects.strip; const sn=put('strip',sr,'ink');
+  buildStrip(sn,sr.w-L,sr.h-L,narrow);
+  for(const id in nodes)if(!want[id]){const n=nodes[id],c=n._cur;tween(n,{x:c.x+c.w/2,y:c.y+c.h/2,w:0,h:0});n._die=1;delete nodes[id]}
+  // boogie segments: inner lines from rect edges
+  segs=[];
+  const all=Object.values(rects).filter(r=>r!==rects.tree).concat(tiles.map(t=>t.r));
+  all.forEach(r=>{if(r.x+r.w<W-L)segs.push({x1:r.x+r.w,y1:r.y,x2:r.x+r.w,y2:r.y+r.h});if(r.y+r.h<H-L)segs.push({x1:r.x,y1:r.y+r.h,x2:r.x+r.w,y2:r.y+r.h})});
+  segs=segs.filter(s=>Math.hypot(s.x2-s.x1,s.y2-s.y1)>40);
+  lastMove=performance.now(); cv.style.opacity=0;
+  const cid=++composeId; setTimeout(()=>{if(cid===composeId)stepTweens(performance.now()+1e5)},1900); // finish even if rAF is throttled
+  sizeCanvas();
+}
+function buildStrip(n,w,h,narrow){
+  const g=3, lw=narrow?84:112, days=D.days, minC=narrow?7:9;
+  const cw=w-lw-g, nc=Math.max(1,Math.min(days.length,Math.floor(cw/minC))), show=days.slice(-nc), cellW=cw/nc;
+  const mx=Math.max(1,...show.map(x=>x.tokens)), rank={};D.models.forEach((m,i)=>rank[m.name]=i);
+  let s=`<div class="slab" style="left:0;top:0;width:${lw}px;height:${h}px"><div class="k">days</div><div><div class="v">${show.length}</div><div class="k" style="font-size:9px;margin-top:4px">peak ${TB.fmt(mx)}</div></div><div class="k" style="font-size:9px">${show[0]?show[0].d.slice(5):''} → ${show.length?show[show.length-1].d.slice(5):''}</div></div>`;
+  const inner=h-2*0;
+  show.forEach((x,i)=>{
+    let dom=null,dv=-1;for(const k in x.byModel)if(x.byModel[k]>dv){dv=x.byModel[k];dom=k}
+    const c=PAL[palFor(rank[dom]||0)], left=lw+g+i*cellW, cwid=Math.max(1,cellW-g);
+    const fh=Math.max(4,(inner-g-10)*x.tokens/mx), eh=fh*(x.est/Math.max(1,x.tokens)), mh=fh-eh;
+    const isT=x.d===D.todayISO;
+    const tip=`${x.d}: ${TB.full(x.tokens)}${x.est?' (est '+TB.fmt(x.est)+')':''} · top ${dom}`;
+    s+=`<div title="${tip}" style="left:${left}px;top:0;width:${cwid}px;height:${inner-fh-g}px;background:${isT?PAL.yellow:PAL.white}"></div>`;
+    if(eh>0)s+=`<div title="${tip}" style="left:${left}px;top:${inner-fh}px;width:${cwid}px;height:${eh}px;background:${PAL.grey}"></div>`;
+    if(mh>0)s+=`<div title="${tip}" style="left:${left}px;top:${inner-mh}px;width:${cwid}px;height:${mh}px;background:${c}"></div>`;
+  });
+  if(n._s!==s){n.innerHTML=`<div class="strip">${s}</div>`;n._s=s}
+}
+const moving=new Set();
+function tween(n,to){n._from={...n._cur};n._to=to;n._t0=performance.now();moving.add(n);applyBox(n,0)}
+const ease=p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+function applyBox(n,p){const a=n._from,b=n._to,e=ease(p),c={x:a.x+(b.x-a.x)*e,y:a.y+(b.y-a.y)*e,w:a.w+(b.w-a.w)*e,h:a.h+(b.h-a.h)*e};n._cur=c;
+  n.style.left=c.x+'px';n.style.top=c.y+'px';n.style.width=c.w+'px';n.style.height=c.h+'px'}
+function stepTweens(now){for(const n of moving){const p=Math.min(1,(now-n._t0)/1700);applyBox(n,p);if(p>=1){moving.delete(n);if(n._die)n.remove()}}}
+function sizeCanvas(){const dpr=Math.min(2,window.devicePixelRatio||1);cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';cx.setTransform(dpr,0,0,dpr,0,0)}
+
+// --- Broadway-Boogie squares travelling along the black lines (energy = intensity) ---
+function spawn(){if(!segs.length)return null;const s=segs[(Math.random()*segs.length)|0];
+  return{s,t:Math.random(),dir:Math.random()<.5?1:-1,c:['red','blue','yellow','yellow','white'][(Math.random()*5)|0],len:Math.hypot(s.x2-s.x1,s.y2-s.y1)}}
+let raf=0,prev=performance.now();
+function frame(){const now=performance.now();
+  const dt=Math.min(.1,(now-prev)/1000);prev=now;
+  stepTweens(now);
+  if(D){
+    // counter
+    const diff=target-disp; disp+= Math.abs(diff)<1?diff:diff*Math.min(1,dt*1.8)+Math.sign(diff);
+    const el=document.getElementById('cnt'); if(el){const t=fullN(disp);if(el.textContent!==t)el.textContent=t}
+    const b=Math.floor(disp/1e8); if(lastBillion!==null&&b>lastBillion){milestone()} lastBillion=b;
+    // squares
+    const settled=now-lastMove>1900; if(settled&&cv.style.opacity!=='1')cv.style.opacity=1;
+    const nWant=Math.round(5+D.intensity*36); while(squares.length<nWant){const q=spawn();if(!q)break;squares.push(q)} squares.length=Math.min(squares.length,nWant);
+    cx.clearRect(0,0,W,H);
+    const sp=30+D.intensity*140, sz=L;
+    for(const q of squares){q.t+=q.dir*sp*dt/q.len; if(q.t<0||q.t>1){Object.assign(q,spawn()||{});continue}
+      const x=q.s.x1+(q.s.x2-q.s.x1)*q.t, y=q.s.y1+(q.s.y2-q.s.y1)*q.t;
+      cx.fillStyle=PAL[q.c]; cx.fillRect(x-sz/2,y-sz/2,sz,sz)}
+  }
+  raf=requestAnimationFrame(frame);
+}
+let bornAt=performance.now();
+function milestone(){if(performance.now()-bornAt<4000)return;seed=(seed*5+3)&255; compose();const n=nodes.total;if(n){n.style.backgroundColor=PAL.yellow;setTimeout(()=>{n.style.backgroundColor=PAL.white},900)}}
+
+TB.onData(d=>{
+  const first=!D; D=d; target=d.total;
+  if(first){disp=Math.max(0,d.total-Math.max(d.today*.03,Math.min(d.total*.002,5e6)));lastBillion=Math.floor(disp/1e8)}
+  document.getElementById('demo').style.display=d.demo?'block':'none';
+  compose();
+});
+// slow re-composition: only the split orientations change, areas stay true to the shares
+setInterval(()=>{if(!document.hidden&&D){seed=(seed+0b10011)&255;compose()}},16000);
+let rt=0,lastVW=innerWidth,lastVH=innerHeight;addEventListener('resize',()=>{if(innerWidth===lastVW&&innerHeight===lastVH)return;lastVW=innerWidth;lastVH=innerHeight;clearTimeout(rt);rt=setTimeout(compose,120)});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelAnimationFrame(raf);else{prev=performance.now();raf=requestAnimationFrame(frame)}});
+raf=requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

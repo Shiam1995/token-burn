@@ -1,0 +1,237 @@
+[
+ {
+  "name": "bakery/bg",
+  "w": 1664,
+  "h": 928,
+  "seed": 3,
+  "prompt": "A cosy anime-style bakery interior at warm afternoon, painted background art of a high-budget Japanese animated film: a glowing brick bread oven on the left, wooden counters and glass display cases full of croissants, melon-pan and pastries, a large window with lace curtains and soft sunbeams, hanging copper pans, flour dust floating in the light, pastel pink and cream palette, rich detail, soft lighting, no people"
+ },
+ {
+  "name": "bakery/bg-night",
+  "w": 1664,
+  "h": 928,
+  "seed": 3,
+  "ref": "bakery/bg.png",
+  "prompt": "Change this exact bakery scene to late evening: deep blue twilight outside the window with a few stars, warm lamplight from hanging pendant lamps, the oven glowing brighter orange, cosy and calm. Keep the same room, layout, furniture and pastries exactly."
+ },
+ {
+  "name": "bakery/baker-a",
+  "w": 832,
+  "h": 1248,
+  "seed": 11,
+  "cutout": true,
+  "prompt": "Polished high-end Japanese anime illustration, clean confident linework, soft cel shading with gentle gradients, chibi proportions (big head, small body), an original cheerful young baker girl with short brown bob hair, tall white chef's hat, pink apron over a cream shirt, holding a long wooden bread peel with a fresh loaf on it, smiling with eyes closed happily. Full body visible from head to feet, centred, on a plain flat pure white background, no shadow on the ground, no text."
+ },
+ {
+  "name": "bakery/baker-b",
+  "w": 832,
+  "h": 1248,
+  "seed": 12,
+  "cutout": true,
+  "prompt": "Polished high-end Japanese anime illustration, clean confident linework, soft cel shading with gentle gradients, chibi proportions (big head, small body), an original energetic baker girl with long bubblegum-pink hair tied with a big bow, mint-green apron with a star pocket, carrying a wooden tray piled with colourful pastries, mid-step walking, delighted open-mouthed expression. Full body visible from head to feet, centred, on a plain flat pure white background, no shadow on the ground, no text."
+ },
+ {
+  "name": "bakery/baker-c",
+  "w": 832,
+  "h": 1248,
+  "seed": 13,
+  "cutout": true,
+  "prompt": "Polished high-end Japanese anime illustration, clean confident linework, soft cel shading with gentle gradients, chibi proportions (big head, small body), an original calm baker boy with spiky navy-blue hair under a blue polka-dot bandana, white baker's coat with rolled sleeves, kneading a ball of dough with both hands, sleepy content smile, flour on his cheek. Full body visible from head to feet, centred, on a plain flat pure white background, no shadow on the ground, no text."
+ },
+ {
+  "name": "bakery/baker-a2",
+  "w": 832,
+  "h": 1248,
+  "seed": 21,
+  "cutout": true,
+  "ref": "bakery/baker-a.cut.png",
+  "prompt": "The exact same chibi baker girl, same face, hair, hat, apron and colours, now cheering with both arms raised high and a big open smile, little sparkles around her. Plain flat pure white background, full body."
+ },
+ {
+  "name": "bakery/baker-b2",
+  "w": 832,
+  "h": 1248,
+  "seed": 22,
+  "cutout": true,
+  "ref": "bakery/baker-b.cut.png",
+  "prompt": "The exact same chibi pink-haired baker girl, same face, outfit and colours, now standing still and proudly holding up one perfect golden croissant with both hands, winking. Plain flat pure white background, full body."
+ },
+ {
+  "name": "bakery/baker-c2",
+  "w": 832,
+  "h": 1248,
+  "seed": 23,
+  "cutout": true,
+  "ref": "bakery/baker-c.cut.png",
+  "prompt": "The exact same chibi baker boy, same face, bandana, coat and colours, now dozing peacefully while standing, eyes closed, holding a rolling pin. Plain flat pure white background, full body."
+ },
+ {
+  "name": "bakery/pastry-0",
+  "w": 640,
+  "h": 640,
+  "seed": 100,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single golden flaky croissant seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "bakery/pastry-1",
+  "w": 640,
+  "h": 640,
+  "seed": 101,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single Japanese melon-pan bun with a crackled sugar crust seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "bakery/pastry-2",
+  "w": 640,
+  "h": 640,
+  "seed": 102,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single round iced bun with pink icing and a cherry seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "bakery/pastry-3",
+  "w": 640,
+  "h": 640,
+  "seed": 103,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single ring doughnut with blue glaze and sprinkles seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "bakery/pastry-4",
+  "w": 640,
+  "h": 640,
+  "seed": 104,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single swirled cinnamon roll with white icing seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "bakery/pastry-5",
+  "w": 640,
+  "h": 640,
+  "seed": 105,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single cupcake with swirled yellow frosting and a star seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "bakery/pastry-6",
+  "w": 640,
+  "h": 640,
+  "seed": 106,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single crusty French baguette seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "bakery/pastry-7",
+  "w": 640,
+  "h": 640,
+  "seed": 107,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single glossy brown soft pretzel with salt seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "bakery/pastry-8",
+  "w": 640,
+  "h": 640,
+  "seed": 108,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single stack of three pastel macarons seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "bakery/pastry-9",
+  "w": 640,
+  "h": 640,
+  "seed": 109,
+  "steps": 30,
+  "cutout": true,
+  "prompt": "Cute appetising anime-style food illustration, a single chocolate chip cookie seen at a slight three-quarter angle, glossy highlights, soft shading, centred on a plain flat pure white background, nothing else in the image, no plate, no text."
+ },
+ {
+  "name": "idol/stage",
+  "w": 1664,
+  "h": 928,
+  "seed": 31,
+  "prompt": "Anime film background art of a huge empty indoor arena concert stage seen from the audience, a giant LED video wall at the back glowing magenta and violet, a long runway extending toward the viewer, steel lighting trusses with many coloured spotlights casting volumetric beams through haze, sparkling confetti in the air, dark audience area at the bottom, dramatic, highly detailed, no people, no text"
+ },
+ {
+  "name": "idol/pose-wave",
+  "w": 832,
+  "h": 1248,
+  "seed": 5,
+  "cutout": true,
+  "prompt": "Full-body anime illustration of an original cheerful idol singer girl, about 17, long twin tails of lavender hair with star hair clips, pink and white frilled stage costume with a short pleated skirt and knee-high white boots, holding a microphone and raising one hand, joyful expression, standing, centred, plain flat white background, clean polished cel shading, high-end anime key visual quality, modest, full body visible head to feet"
+ },
+ {
+  "name": "idol/pose-sing",
+  "w": 832,
+  "h": 1248,
+  "seed": 41,
+  "cutout": true,
+  "ref": "test/idol.cut.png",
+  "prompt": "The exact same idol girl with the same face, lavender twin tails, star clips, pink and white costume and white boots, now singing passionately with eyes closed, holding the microphone close with both hands, leaning slightly forward, hair swaying. Full body, plain flat pure white background."
+ },
+ {
+  "name": "idol/pose-jump",
+  "w": 832,
+  "h": 1248,
+  "seed": 42,
+  "cutout": true,
+  "ref": "test/idol.cut.png",
+  "prompt": "The exact same idol girl with the same face, lavender twin tails, star clips, pink and white costume and white boots, now jumping joyfully in the air with one leg bent, pointing the microphone at the audience, twin tails flying, big grin. Full body, plain flat pure white background."
+ },
+ {
+  "name": "idol/pose-peace",
+  "w": 832,
+  "h": 1248,
+  "seed": 43,
+  "cutout": true,
+  "ref": "test/idol.cut.png",
+  "prompt": "The exact same idol girl with the same face, lavender twin tails, star clips, pink and white costume and white boots, now winking and making a peace sign next to her eye with her free hand, other hand holding the microphone, cute pose with a slight head tilt. Full body, plain flat pure white background."
+ },
+ {
+  "name": "idol/closeup",
+  "w": 1024,
+  "h": 1024,
+  "seed": 44,
+  "ref": "test/idol.cut.png",
+  "prompt": "A close-up portrait of the exact same idol girl, same face, lavender hair and star clips, singing into the microphone under pink stage lights, sweat sparkles, bokeh of stage lights behind her, like a concert camera close-up shot on a big screen."
+ },
+ {
+  "name": "hanabi/bg",
+  "w": 1664,
+  "h": 928,
+  "seed": 51,
+  "prompt": "Painted anime film background: a calm summer night over a wide bay, deep indigo sky with a soft full moon and faint stars, the upper half of the sky mostly empty and dark, a distant glittering city skyline with lit windows and a tall slender lattice tower, a long bridge with lights, a distant snow-capped volcano silhouette on the left, shimmering reflections on the water, cinematic, highly detailed, no fireworks, no people, no text"
+ },
+ {
+  "name": "hanabi/fg",
+  "w": 1664,
+  "h": 928,
+  "seed": 52,
+  "cutout": true,
+  "prompt": "Anime illustration, a crowd of festival-goers seen from behind at the bottom of the image, many people in colourful yukata and summer clothes, some holding paper fans, cotton candy and children on shoulders, looking up, plus a row of festival food stalls with red-white striped awnings and glowing paper lanterns on both sides, warm lantern light on them, plain flat pure white background above them, nothing in the upper half"
+ },
+ {
+  "name": "atlas/land",
+  "w": 1664,
+  "h": 928,
+  "seed": 61,
+  "prompt": "Painted landscape at night in a romantic nineteenth-century style, rolling dark hills and a pine forest along the bottom third, a small domed astronomical observatory on a hill on the right with a warm lit doorway and a little cottage with glowing windows, a winding path, a faint mist in the valley, the whole upper two-thirds is a smooth plain deep navy night sky with NO stars and no moon, rich painterly detail, dark moody colours"
+ },
+ {
+  "name": "arcade/bg",
+  "w": 1664,
+  "h": 928,
+  "seed": 71,
+  "prompt": "16-bit pixel art side-scrolling platform game background, crisp large pixels, bright blue sky with fluffy pixel clouds, layered purple-blue mountains with a snowy peak, a distant pixel city skyline, green rolling hills and pine trees along the bottom, vivid limited palette, retro console style, no characters, no HUD, no text"
+ }
+]
