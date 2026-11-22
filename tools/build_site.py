@@ -47,7 +47,7 @@ def main():
         s = s.replace('href="/gallery"', f'href="{base}designs/gallery.html"')
         s = s.replace('"/designs/', f'"{base}designs/').replace('href="/"', f'href="{base}"')
         s = s.replace("from this computer's logs", "from every computer that publishes (rounded)")
-        s = s.replace("Fusion ledger · local", "Fusion ledger · shared").replace("FUSION LEDGER · LOCAL", "FUSION LEDGER · SHARED")
+        s = s.replace("fusion ledger · local", "fusion ledger · shared").replace("FUSION LEDGER · LOCAL", "FUSION LEDGER · SHARED")
         f.write_text(s, encoding="utf-8")
     print(f"built {OUT} for {repo} at {base}: {len(listing)} designs")
 
